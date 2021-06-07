@@ -1,0 +1,59 @@
+# cmpp 客户端配置
+[cmpp_client]
+[cmpp_client.client]
+key = "client"
+version = "V21"
+read_timeout = 5
+active_test_interval = 60
+max_no_resp_pkg_num = 3
+enable = true
+[[cmpp_client.client.accounts]]
+ip = "192.168.188.57"
+port = 7890
+username = "v2tes4"
+password = "v2tes4"
+sp_id = "v2tes4"
+sp_code = "1069000"
+[[cmpp_client.client.accounts]]
+ip = "10.66.152.33"
+port = 7890
+username = "200001"
+password = "test123"
+sp_id = "1000"
+sp_code = "1000"
+
+# 发送短信内容配置
+[[cmpp_client.messages]]
+# 扩展码
+extend = ""
+content = "【longdongqiang】云主机大促了，登录https://ucloud.cn，领取属于您的优惠。回T退订"
+phone = "18516238513"
+
+# cmpp 服务端配置
+[cmpp_server]
+ip = "192.168.188.57"
+port = 7890
+enable = true
+version = "V21"
+
+# 压测配置
+[stress_test]
+concurrency = 1000
+duration_time = 120
+total_num = 10000
+
+# 日志配置
+[log]
+dir = "./log"
+file = "mock-cmpp-stress-test.log"
+level = "info"
+local_time = true
+
+# redis配置
+[redis]
+ip = "127.0.0.1"
+port = 3306
+password = ""
+timeout = 300
+wait = true
+enable = true
