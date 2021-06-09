@@ -21,8 +21,7 @@ func (s *CmppServer) Init(logger *zap.Logger) {
 }
 // 连接cmpp客户端
 func (s *CmppServer) Start() error {
-	//csm := &pkg.CmppServerManager{}
-	//csm.Init(s.cfg.Version , s.cfg.IP)
+
 	return nil
 }
 

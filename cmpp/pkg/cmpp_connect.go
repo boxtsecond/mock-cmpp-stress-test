@@ -111,14 +111,16 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 	sm.Version = v
 
 	cfg := config.ConfigObj.ServerConfig
-	for _, auth := range *cfg.Auths {
-		sm.UserMap[auth.UserName] = &Conn{
-			UserName: auth.UserName,
-			password: auth.Password,
-			spId:     auth.SpId,
-			spCode:   auth.SpCode,
-		}
-	}
+	// 读取账户？？有了缓存是不是其实没用了
+	// sm.UserMap =
+	//for _, auth := range *cfg.Auths {
+	//	sm.UserMap[auth.UserName] = &Conn{
+	//		UserName: auth.UserName,
+	//		password: auth.Password,
+	//		spId:     auth.SpId,
+	//		spCode:   auth.SpCode,
+	//	}
+	//}
 	sm.heartbeat = time.Duration(cfg.HeartBeat) * time.Second
 	sm.maxNoRespPkgs = int32(cfg.MaxNoRspPkgs)
 
