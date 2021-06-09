@@ -67,7 +67,31 @@ func (cm *CmppClientManager) Connect() error {
 func (cm *CmppClientManager) Disconnect() {
 	cm.Client.Disconnect()
 	cm.Connected = false
-	log.Logger.Info("[CmppClient][Disconnect] Success.", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("Password", cm.Password))
+	log.Logger.Info("[CmppClient][Disconnect] Success", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("Password", cm.Password))
+}
+
+func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
+	switch p := pkg.(type) {
+	case *cmpp.CmppActiveTestReqPkt:
+		return cm.CmppActiveTestReq(p)
+	case *cmpp.CmppActiveTestRspPkt:
+		return cm.CmppActiveTestRsp(p)
+
+	case *cmpp.Cmpp2SubmitRspPkt:
+		return cm.Cmpp2SubmitResp(p)
+	case *cmpp.Cmpp3SubmitRspPkt:
+		return cm.Cmpp3SubmitResp(p)
+
+	case *cmpp.Cmpp2DeliverReqPkt:
+		return cm.Cmpp2DeliverReq(p)
+	case *cmpp.Cmpp3DeliverReqPkt:
+		return cm.Cmpp3DeliverReq(p)
+	default:
+		typeErr := errors.New("unhandled pkg type")
+		log.Logger.Error("[CmppClient][ReceivePkgs] Error",
+			zap.Error(typeErr))
+	}
+	return nil
 }
 
 // =====================CmppClient=====================

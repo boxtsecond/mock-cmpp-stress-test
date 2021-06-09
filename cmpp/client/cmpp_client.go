@@ -5,6 +5,8 @@ import (
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
+	"mock-cmpp-stress-test/utils/log"
+	"net"
 	"strings"
 	"time"
 )
@@ -28,7 +30,6 @@ func (s *CmppClient) Start() (err error) {
 
 	version := s.cfg.Version
 	timeout := time.Duration(s.cfg.TimeOut) * time.Second
-
 	errCount := 0
 
 	for _, account := range *s.cfg.Accounts {
@@ -61,6 +62,7 @@ func (s *CmppClient) Start() (err error) {
 
 	if errCount == 0 {
 		s.Logger.Info("Cmpp Client Connect Success")
+		s.Receive()
 	}
 	return err
 }
@@ -70,4 +72,44 @@ func (s *CmppClient) Stop() error {
 		client.Disconnect()
 	}
 	return nil
+}
+
+func (s *CmppClient) Receive() {
+	if len(Clients) == 0 {
+		return
+	}
+
+	for _, c := range Clients {
+		go func(cm *pkg.CmppClientManager) {
+			errCount := 0
+			for {
+				receivePkg, err := cm.Client.RecvAndUnpackPkt(cm.Timeout)
+				if err != nil {
+					errCount += 1
+					if e, ok := err.(net.Error); ok && e.Timeout() {
+						continue
+					}
+					if errCount > 3 {
+						log.Logger.Error("[CmppClient][ReceivePkgs] Error And Return",
+							zap.String("UserName", cm.UserName),
+							zap.String("Address", cm.Addr),
+							zap.Error(err))
+						break
+					}
+					log.Logger.Error("[CmppClient][ReceivePkgs] Error",
+						zap.String("UserName", cm.UserName),
+						zap.String("Address", cm.Addr),
+						zap.Error(err))
+				}
+				receiveErr := cm.ReceivePkg(receivePkg)
+				if receiveErr != nil {
+					log.Logger.Error("[CmppClient][ReceivePkgs] Error",
+						zap.String("UserName", cm.UserName),
+						zap.String("Address", cm.Addr),
+						zap.Any("Pkg", receivePkg),
+						zap.Error(err))
+				}
+			}
+		}(c)
+	}
 }
