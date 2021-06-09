@@ -8,6 +8,7 @@ import (
 	cmpputils "github.com/bigwhite/gocmpp/utils"
 	"go.uber.org/zap"
 	_log "log"
+	"mock-cmpp-stress-test/cmpp/cron"
 	"mock-cmpp-stress-test/config"
 	"mock-cmpp-stress-test/utils/cache"
 	"mock-cmpp-stress-test/utils/log"
@@ -87,8 +88,8 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 
 	cfg := config.ConfigObj.ServerConfig
 	for _, auth := range *cfg.Auths {
-		sm.ConnMap[auth.Username] = &Conn{
-			UserName: auth.Username,
+		sm.UserMap[auth.UserName] = &Conn{
+			UserName: auth.UserName,
 			password: auth.Password,
 			spId:     auth.SpId,
 			spCode:   auth.SpCode,
@@ -96,10 +97,14 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 	}
 	sm.heartbeat = time.Duration(cfg.HeartBeat) * time.Second
 	sm.maxNoRespPkgs = int32(cfg.MaxNoRspPkgs)
+
 	return nil
 }
 
 func (sm *CmppServerManager) Start() error {
+	// 启动定时
+	cron.Start()
+	// 启动端口服务
 	err := cmpp.ListenAndServe(sm.Addr, sm.Version,
 		sm.heartbeat,
 		sm.maxNoRespPkgs,
