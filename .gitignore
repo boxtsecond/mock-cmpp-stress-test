@@ -2,4 +2,6 @@
 *.test
 
 .idea
-./log
+./log/*
+*.log
+./tmp/

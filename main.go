@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/client"
+	"mock-cmpp-stress-test/stress_test_service"
+
 	"mock-cmpp-stress-test/cmpp/server"
 
-	//"mock-cmpp-stress-test/cmpp/server"
 	"mock-cmpp-stress-test/config"
 	"mock-cmpp-stress-test/utils/log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 type Service interface {
@@ -21,15 +23,17 @@ type Service interface {
 	Stop() error
 }
 
-var Services = map[string]Service{
+var Services = []Service{
 	// CMPP 客户端
-	"CmppClient": new(client.CmppClient),
+	new(client.CmppClient),
 	// CMPP 服务端
-	"CmppServer": new(server.CmppServer),
+
+	new(server.CmppServer),
 	// redis 服务
-	//"Redis": new(client.CmppClient),
+	//new(client.CmppClient),
 	// 压测服务
-	//"StressTest": new(stress_test_service.StressTest),
+	new(stress_test_service.StressTest),
+
 }
 
 func Init() error {
@@ -46,13 +50,13 @@ func Start() error {
 		if err := service.Start(); err != nil {
 			return err
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	return nil
 }
 
 func Stop() error {
 	for _, service := range Services {
-		service.Init(log.Logger)
 		if err := service.Stop(); err != nil {
 			return err
 		}

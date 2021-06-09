@@ -75,7 +75,7 @@ func (cm *CmppClientManager) Cmpp2Submit(message *config.TextMessages) (error, [
 			return sendErr, seqIds
 		}
 		seqIds = append(seqIds, seqId)
-		setCacheErr := cm.Cache.Set(strconv.Itoa(int(seqId)), "")
+		setCacheErr := cm.Cache.Set(strconv.Itoa(int(seqId)), strings.Join([]string{cm.Addr, cm.UserName, cm.SpId, cm.SpCode, message.Phone}, ","))
 		if setCacheErr != nil {
 			log.Logger.Error("[CmppClient][Cmpp2Submit][SetCache] Error:", zap.Error(setCacheErr))
 		}
@@ -90,16 +90,20 @@ func (cm *CmppClientManager) Cmpp2SubmitResp(resp *cmpp.Cmpp2SubmitRspPkt) error
 	defer cm.Cache.Delete(key)
 
 	if data == "" {
-		return errors.New("Get Cache Error ")
+		return errors.New("get cache error")
 	}
 
 	// TODO: Add statistics, cache or redis
 	if resp.Result == 0 {
 		log.Logger.Info("[CmppClient][Cmpp2SubmitResp] Success",
+			zap.String("Addr", cm.Addr),
+			zap.String("UserName", cm.UserName),
 			zap.Uint32("SeqId", resp.SeqId),
 			zap.Uint64("MsgId", resp.MsgId))
 	} else {
 		log.Logger.Info("[CmppClient][Cmpp2SubmitResp] Error",
+			zap.String("Addr", cm.Addr),
+			zap.String("UserName", cm.UserName),
 			zap.Uint32("SeqId", resp.SeqId),
 			zap.Uint64("MsgId", resp.MsgId),
 			zap.Uint8("ErrorCode", resp.Result))
@@ -173,7 +177,7 @@ func (cm *CmppClientManager) Cmpp3Submit(message *config.TextMessages) (error, [
 		}
 
 		seqIds = append(seqIds, seqId)
-		setCacheErr := cm.Cache.Set(strconv.Itoa(int(seqId)), "")
+		setCacheErr := cm.Cache.Set(strconv.Itoa(int(seqId)), strings.Join([]string{cm.Addr, cm.UserName, cm.SpId, cm.SpCode, message.Phone}, ","))
 		if setCacheErr != nil {
 			log.Logger.Error("[CmppClient][Cmpp3Submit][SetCache] Error:", zap.Error(setCacheErr))
 		}
@@ -195,7 +199,7 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 	defer cm.Cache.Delete(key)
 
 	if data == "" {
-		return errors.New("Get Cache Error ")
+		return errors.New("get cache error")
 	}
 
 	// TODO: Add statistics, cache or redis

@@ -9,27 +9,22 @@ import (
 
 // =====================CmppClient=====================
 
-func (cm *CmppClientManager) Cmpp2Deliver(seqId uint32) (*cmpp.Cmpp2DeliverReqPkt, error) {
-	msgId, err := GetMsgId(cm.SpId, seqId)
-	if err != nil {
-		log.Logger.Error("[CmppUtils][GetMsgId] ParseUint Error", zap.Error(err))
-	}
-	p := &cmpp.Cmpp2DeliverReqPkt{
-		MsgId:            msgId,
-		DestId:           "",
-		ServiceId:        "",
-		TpPid:            0,
-		TpUdhi:           0,
-		MsgFmt:           0,
-		SrcTerminalId:    "",
-		RegisterDelivery: 0,
-		MsgLength:        0,
-		MsgContent:       "",
-		Reserve:          "",
-		SeqId:            0,
-	}
+func (cm *CmppClientManager) Cmpp2DeliverReq(pkg *cmpp.Cmpp2DeliverReqPkt) error {
+	log.Logger.Info("[CmppClient][Cmpp2DeliverReq] Success",
+		zap.String("Addr", cm.Addr),
+		zap.String("UserName", cm.UserName),
+		zap.Any("Pkg", pkg))
+	// TODO: 接收回执打点
+	return nil
+}
 
-	return p, nil
+func (cm *CmppClientManager) Cmpp3DeliverReq(pkg *cmpp.Cmpp3DeliverReqPkt) error {
+	// TODO: 接收回执打点
+	log.Logger.Info("[CmppClient][Cmpp3DeliverReq] Success",
+		zap.String("Addr", cm.Addr),
+		zap.String("UserName", cm.UserName),
+		zap.Any("Pkg", pkg))
+	return nil
 }
 
 // =====================CmppClient=====================
