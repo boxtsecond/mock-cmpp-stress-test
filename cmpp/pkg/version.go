@@ -1,15 +1,15 @@
 package pkg
 
-type Version uint8
+import cmpp "github.com/bigwhite/gocmpp"
 
 const (
-	V30            Version = 0x30
-	V21            Version = 0x21
-	V20            Version = 0x20
-	InvalidVersion Version = 0x00
+	V30            cmpp.Type = 0x30
+	V21            cmpp.Type = 0x21
+	V20            cmpp.Type = 0x20
+	InvalidVersion cmpp.Type = 0x00
 )
 
-func (v Version) String() string {
+func String(v cmpp.Type) string {
 	switch v {
 	case V30:
 		return "cmpp3.0"
@@ -22,7 +22,7 @@ func (v Version) String() string {
 	return "unknown"
 }
 
-func GetVersion(version string) Version {
+func GetVersion(version string) cmpp.Type {
 	switch version {
 	case "V30":
 		return V30

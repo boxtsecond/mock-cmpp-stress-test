@@ -67,6 +67,8 @@ func main() {
 		return
 	}
 
+	log.Logger.Info("Start Success.")
+
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	<-quit

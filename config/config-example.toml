@@ -1,40 +1,42 @@
 # cmpp 客户端配置
 [cmpp_client]
-[cmpp_client.client]
 key = "client"
 version = "V21"
-read_timeout = 5
+retries = 1
+read_timeout = 1
 active_test_interval = 60
 max_no_resp_pkg_num = 3
 enable = true
-[[cmpp_client.client.accounts]]
-ip = "192.168.188.57"
+[[cmpp_client.accounts]]
+ip = "127.0.0.1"
 port = 7890
-username = "v2tes4"
-password = "v2tes4"
-sp_id = "v2tes4"
-sp_code = "1069000"
-[[cmpp_client.client.accounts]]
-ip = "10.66.152.33"
-port = 7890
-username = "200001"
-password = "test123"
-sp_id = "1000"
-sp_code = "1000"
+username = ""
+password = ""
+sp_id = ""
+sp_code = ""
 
 # 发送短信内容配置
 [[cmpp_client.messages]]
 # 扩展码
 extend = ""
-content = "【longdongqiang】云主机大促了，登录https://ucloud.cn，领取属于您的优惠。回T退订"
-phone = "18516238513"
+content = "【Test】领取属于您的优惠。回T退订"
+phone = "12345678901"
 
 # cmpp 服务端配置
 [cmpp_server]
-ip = "192.168.188.57"
+ip = "127.0.0.1"
 port = 7890
 enable = true
 version = "V21"
+# 心跳检测时间
+heartbeat = 1
+# 无响应时发送最大包个数
+max_no_resp_pkgs = 3
+[[cmpp_server.auths]]
+username = "test"
+password = "test123"
+sp_id = ""
+sp_code = ""
 
 # 压测配置
 [stress_test]

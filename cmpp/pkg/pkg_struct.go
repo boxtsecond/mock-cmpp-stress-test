@@ -1,12 +1,11 @@
 package pkg
 
 import (
-	"errors"
+	"fmt"
 	cmpp "github.com/bigwhite/gocmpp"
-	cmpputils "github.com/bigwhite/gocmpp/utils"
-	"log"
 	"math"
 	"mock-cmpp-stress-test/utils/cache"
+	"strconv"
 	"time"
 )
 
@@ -15,36 +14,39 @@ const (
 	defaultTimeout = 5 * time.Second
 )
 
-type Cmpp2ConnReqPkg struct {
-	SrcAddr   string
-	AuthSrc   string
-	Version   Version
-	Timestamp uint32
-	Secret    string
-	SeqId     uint32
-}
-
+// cmpp client
 type CmppClientManager struct {
 	// setting
 	Addr     string        // cmpp server address
 	UserName string        // cmpp connect username
-	password string        // cmpp connect password
-	spId     string        // cmpp submit sp_id
-	spCode   string        // cmpp submit sp_code
-	retries  uint8         // cmpp connect retry times
-	timeout  time.Duration // cmpp connect timeout
+	Password string        // cmpp connect password
+	SpId     string        // cmpp submit sp_id
+	SpCode   string        // cmpp submit sp_code
+	Retries  uint          // cmpp connect retry times
+	Timeout  time.Duration // cmpp connect timeout
 
 	Client    *cmpp.Client // cmpp client
-	connected bool
+	Connected bool
 	Cache     *cache.Cache
 }
 
-func NewClient(version string) (*cmpp.Client, error) {
-	v := GetVersion(version)
-	if v == InvalidVersion {
-		return nil, errors.New("invalid cmpp version")
-	}
-	return cmpp.NewClient(v), nil
+// cmpp server
+type CmppServerManager struct {
+	// setting
+	Addr          string    // cmpp client address
+	version       cmpp.Type // cmpp server version
+	heartbeat     time.Duration
+	maxNoRespPkgs int32
+
+	ConnMap map[string]*Conn
+	UserMap map[string]*Conn
+}
+
+type Conn struct {
+	UserName string // cmpp connect auth username
+	password string // cmpp connect auth password
+	spId     string // cmpp submit sp_id
+	spCode   string // cmpp submit sp_code
 }
 
 var TpUdhiSeq byte = 0x00
@@ -80,4 +82,20 @@ func (cm *CmppClientManager) SplitLongSms(content string) [][]byte {
 		chunks = append(chunks, chunk)
 	}
 	return chunks
+}
+
+func GetMsgId(spId string, seqId uint32) (uint64, error) {
+	now := time.Now()
+	month, _ := strconv.ParseInt(fmt.Sprintf("%d", now.Month()), 10, 32)
+	day := now.Day()
+	hour := now.Hour()
+	min := now.Minute()
+	sec := now.Second()
+	spIdInt, _ := strconv.ParseInt(spId, 10, 32)
+	binaryStr := fmt.Sprintf("%04b%05b%05b%06b%06b%022b%016b", month, day, hour, min, sec, spIdInt, seqId)
+	msgId, err := strconv.ParseUint(binaryStr, 2, 64)
+	if err != nil {
+		return 0, err
+	}
+	return msgId, nil
 }

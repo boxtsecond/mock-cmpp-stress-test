@@ -1,152 +1,73 @@
 package client
 
 import (
-	goCmpp "github.com/bigwhite/gocmpp"
+	"fmt"
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
-	"net"
+	"strings"
 	"time"
 )
 
 type CmppClient struct {
-	cfg    *config.CmppClientConfig
-	Logger *zap.Logger
+	cfg     *config.CmppClientConfig
+	Logger  *zap.Logger
+	Clients map[string]*pkg.CmppClientManager
 }
 
 func (s *CmppClient) Init(logger *zap.Logger) {
 	s.cfg = config.ConfigObj.ClientConfig
 	s.Logger = logger
+	s.Clients = make(map[string]*pkg.CmppClientManager, 0)
 }
 
-func (s *CmppClient) Start() error {
-	if !s.cfg.CmppClient.Enable {
-		return nil
+func (s *CmppClient) Start() (err error) {
+	if !s.cfg.Enable {
+		return err
 	}
 
-	version := s.cfg.CmppClient.Version
-	client, err := pkg.NewClient(version)
-	//if err != nil {
-	//	log.Println(err)
-	//	return
-	//}
-	//
-	//c := NewCmppClientManager(endpoint, cmppClient)
-	//c.login()
-	return nil
+	version := s.cfg.Version
+	timeout := time.Duration(s.cfg.TimeOut) * time.Second
+
+	errCount := 0
+
+	for _, account := range *s.cfg.Accounts {
+		cm := &pkg.CmppClientManager{}
+		addr := fmt.Sprintf("%s:%d", account.Ip, account.Port)
+
+		initErr := cm.Init(version, addr, account.Username, account.Password, account.SpID, account.SpCode, s.cfg.Retries, timeout)
+		if initErr != nil {
+			s.Logger.Error("Cmpp Client Init Error",
+				zap.String("UserName", account.Username),
+				zap.String("Address", addr),
+				zap.Error(err))
+			return initErr
+		}
+		s.Logger.Info("Cmpp Client Init Success",
+			zap.String("UserName", account.Username),
+			zap.String("Address", addr))
+		err = cm.Connect()
+		if err != nil {
+			s.Logger.Error("Cmpp Client Connect Error",
+				zap.String("UserName", account.Username),
+				zap.String("Address", addr),
+				zap.Error(err))
+			errCount += 1
+			continue
+		}
+		key := strings.Join([]string{addr, account.Username}, "_")
+		s.Clients[key] = cm
+	}
+
+	if errCount == 0 {
+		s.Logger.Info("Cmpp Client Connect Success")
+	}
+	return err
 }
 
 func (s *CmppClient) Stop() error {
-	//version := s.cfg.CmppClient.Version
-	//cmppClient, err := newClient()
-	//if err != nil {
-	//	log.Println(err)
-	//	return
-	//}
-	//
-	//c := NewCmppClientManager(endpoint, cmppClient)
-	//c.login()
+	for _, client := range s.Clients {
+		client.Disconnect()
+	}
 	return nil
 }
-
-//func (s *CmppClient) connect() error {
-//	version := s.cfg.CmppClient.Version
-//
-//}
-
-//var cmppClientsMap map[string]*CmppClientManager
-//
-//type CmppClientManager struct {
-//	Accounts  *[]config.CmppAccount
-//	Client    *goCmpp.Client
-//	PingChan  chan struct{}
-//	Connected bool
-//	retries   uint8
-//	logger    *zap.Logger
-//}
-//
-//func (c *CmppClientManager) Init() {
-//	//cfg := config.ConfigObj.ClientConfig
-//}
-//
-//func (c *CmppClientManager) Connect(addr, username, password string, timeout time.Duration) error {
-//	conn, err := net.DialTimeout("tcp", addr, timeout)
-//	if err != nil {
-//		return err
-//	}
-//
-//	c.conn = NewConn(conn, c.v)
-//	c.conn.SetState(CONN_CONNECTED)
-//
-//	var req Packer
-//
-//	if c.v == pkg.V20 || c.v == pkg.V21 {
-//		// login
-//		req = &pkg.Cmpp2ConnReqPkg{
-//			SrcAddr: username,
-//			Secret:  password,
-//			Version: c.v,
-//		}
-//	} else {
-//		req = &pkg.Cmpp3ConnReqPkg{
-//			SrcAddr: username,
-//			Secret:  password,
-//			Version: c.v,
-//		}
-//	}
-//
-//	// 发送connect包
-//	_, err = c.SendReqPkg(req)
-//	if err != nil {
-//		return err
-//	}
-//	// 接收connect_resp包
-//	p, _, _, err := c.RecvAndUnpackPkg(timeout)
-//	if err != nil {
-//		return err
-//	}
-//
-//	var ok bool
-//	var status uint8
-//	if c.v == pkg.V20 || c.v == pkg.V21 {
-//		var reqObj *pkg.Cmpp2ConnRespPkg
-//		reqObj, ok = p.(*pkg.Cmpp2ConnRespPkg)
-//		if !ok {
-//			return pkg.ErrConnVersionTooHigh
-//		}
-//		status = reqObj.Status
-//	} else {
-//		var reqObj *pkg.Cmpp3ConnRespPkg
-//		reqObj, ok = p.(*pkg.Cmpp3ConnRespPkg)
-//		if !ok {
-//			return pkg.ErrConnVersionTooHigh
-//		}
-//		status = uint8(reqObj.Status)
-//	}
-//
-//	if status != 0 {
-//		return pkg.ConnRespStatusErrMap[status]
-//	}
-//
-//	return nil
-//}
-//
-//func NewConn(conn net.Conn, v pkg.Version) *Conn {
-//	seqId, done := newSeqIdGenerator()
-//	submitSeqId, submitDone := newSubmitSeqIdGenerator()
-//
-//	c := &Conn{
-//		Conn:        conn,
-//		Version:     v,
-//		SeqId:       seqId,
-//		SubmitSeqId: submitSeqId,
-//		done:        done,
-//		submitDone:  submitDone,
-//		stop:        make(chan struct{}),
-//	}
-//
-//	tcp := c.Conn.(*net.TCPConn)
-//	tcp.SetKeepAlive(true)
-//
-//	return c
-//}

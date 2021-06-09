@@ -4,6 +4,7 @@ import (
 	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
 )
 
 type Config struct {
@@ -35,14 +36,18 @@ func Init(cfg *Config) {
 	default:
 		zapLevel = zap.InfoLevel
 	}
-	encoderConfig := zap.NewProductionEncoderConfig()
 
-	// 时间格式
+	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoderConfig),
-		w,
-		zapLevel,
+
+	core := zapcore.NewTee(
+		zapcore.NewCore(
+			zapcore.NewConsoleEncoder(encoderConfig),
+			w,
+			zapLevel,
+		),
+		zapcore.NewCore(zapcore.NewConsoleEncoder(encoderConfig),
+			zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout)), zapLevel),
 	)
 
 	Logger = zap.New(core, zap.AddCaller(), zap.Development())
