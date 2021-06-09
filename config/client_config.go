@@ -9,20 +9,12 @@ type CmppAccount struct {
 	SpCode   string `toml:"sp_code"`
 }
 
-type CmppMessages struct {
-	Extend  string `toml:"extend"`
-	Content string `toml:"content"`
-	Phone   string `toml:"phone"`
-}
-
 type CmppClientConfig struct {
-	Key                string          `toml:"key"`
-	Version            string          `toml:"version"`
-	TimeOut            uint            `toml:"read_timeout"`
-	Retries            uint            `toml:"retries"`
-	ActiveTestInterval uint            `toml:"active_test_interval"`
-	MaxNoRespPkgNum    uint            `toml:"max_no_resp_pkg_num"`
-	Enable             bool            `toml:"enable"`
-	Accounts           *[]CmppAccount  `toml:"accounts"`
-	Messages           *[]CmppMessages `toml:"messages"`
+	Version            string         `toml:"version"`
+	TimeOut            uint           `toml:"read_timeout"`
+	Retries            uint           `toml:"retries"`
+	ActiveTestInterval uint           `toml:"active_test_interval"`
+	MaxNoRespPkgNum    uint           `toml:"max_no_resp_pkg_num"`
+	Enable             bool           `toml:"enable"`
+	Accounts           *[]CmppAccount `toml:"accounts"`
 }

@@ -18,6 +18,7 @@ const (
 type CmppClientManager struct {
 	// setting
 	Addr     string        // cmpp server address
+	Version  cmpp.Type     // cmpp version
 	UserName string        // cmpp connect username
 	Password string        // cmpp connect password
 	SpId     string        // cmpp submit sp_id
@@ -34,7 +35,7 @@ type CmppClientManager struct {
 type CmppServerManager struct {
 	// setting
 	Addr          string    // cmpp client address
-	version       cmpp.Type // cmpp server version
+	Version       cmpp.Type // cmpp version
 	heartbeat     time.Duration
 	maxNoRespPkgs int32
 

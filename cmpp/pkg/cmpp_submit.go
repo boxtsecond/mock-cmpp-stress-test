@@ -15,7 +15,7 @@ import (
 
 // =====================CmppClient=====================
 // =====================Cmpp2Submit=====================
-func (cm *CmppClientManager) GetCmppSubmit2ReqPkg(message *config.CmppMessages) ([]*cmpp.Cmpp2SubmitReqPkt, error) {
+func (cm *CmppClientManager) GetCmppSubmit2ReqPkg(message *config.TextMessages) ([]*cmpp.Cmpp2SubmitReqPkt, error) {
 	packets := make([]*cmpp.Cmpp2SubmitReqPkt, 0)
 	content, err := cmpputils.Utf8ToUcs2(message.Content)
 	if err != nil {
@@ -61,7 +61,7 @@ func (cm *CmppClientManager) GetCmppSubmit2ReqPkg(message *config.CmppMessages) 
 	return packets, nil
 }
 
-func (cm *CmppClientManager) Cmpp2Submit(message *config.CmppMessages) (error, []uint32) {
+func (cm *CmppClientManager) Cmpp2Submit(message *config.TextMessages) (error, []uint32) {
 	pkgs, err := cm.GetCmppSubmit2ReqPkg(message)
 	seqIds := make([]uint32, 0)
 	if err != nil {
@@ -110,7 +110,7 @@ func (cm *CmppClientManager) Cmpp2SubmitResp(resp *cmpp.Cmpp2SubmitRspPkt) error
 // =====================Cmpp2Submit=====================
 
 // =====================Cmpp3Submit=====================
-func (cm *CmppClientManager) GetCmppSubmit3ReqPkg(message *config.CmppMessages) ([]*cmpp.Cmpp3SubmitReqPkt, error) {
+func (cm *CmppClientManager) GetCmppSubmit3ReqPkg(message *config.TextMessages) ([]*cmpp.Cmpp3SubmitReqPkt, error) {
 	packets := make([]*cmpp.Cmpp3SubmitReqPkt, 0)
 	content, err := cmpputils.Utf8ToUcs2(message.Content)
 	if err != nil {
@@ -158,7 +158,7 @@ func (cm *CmppClientManager) GetCmppSubmit3ReqPkg(message *config.CmppMessages) 
 	return packets, nil
 }
 
-func (cm *CmppClientManager) Cmpp3Submit(message *config.CmppMessages) (error, []uint32) {
+func (cm *CmppClientManager) Cmpp3Submit(message *config.TextMessages) (error, []uint32) {
 	pkgs, err := cm.GetCmppSubmit3ReqPkg(message)
 	seqIds := make([]uint32, 0)
 	if err != nil {

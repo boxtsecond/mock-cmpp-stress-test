@@ -21,8 +21,12 @@ func (s *CmppServer) Init(logger *zap.Logger) {
 	s.Logger = logger
 }
 
-func (s *CmppServer) Start() {
+func (s *CmppServer) Start() error {
+	return nil
+}
 
+func (s *CmppServer) Stop() error {
+	return nil
 }
 
 func (s *CmppServer) StartDeliver() {

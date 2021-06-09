@@ -23,6 +23,7 @@ func (cm *CmppClientManager) Init(version, addr, username, password, spId, spCod
 	}
 	cm.Client = cmpp.NewClient(v)
 	cm.Addr = addr
+	cm.Version = v
 	cm.UserName = username
 	cm.Password = password
 	cm.Retries = retryTimes
@@ -82,7 +83,7 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 	}
 
 	sm.Addr = addr
-	sm.version = v
+	sm.Version = v
 
 	cfg := config.ConfigObj.ServerConfig
 	for _, auth := range *cfg.Auths {
@@ -99,7 +100,7 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 }
 
 func (sm *CmppServerManager) Start() error {
-	err := cmpp.ListenAndServe(sm.Addr, sm.version,
+	err := cmpp.ListenAndServe(sm.Addr, sm.Version,
 		sm.heartbeat,
 		sm.maxNoRespPkgs,
 		nil,
@@ -112,7 +113,7 @@ func (sm *CmppServerManager) Start() error {
 	}
 	log.Logger.Info("[CmppServer][Start] Success",
 		zap.String("Address", sm.Addr),
-		zap.String("Version", string(sm.version)))
+		zap.String("Version", string(sm.Version)))
 	return nil
 }
 
@@ -145,7 +146,7 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 			zap.String("UserName", pkg.SrcAddr))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnInvalidSrcAddr]
 	}
-	if sm.version == cmpp.V30 {
+	if sm.Version == cmpp.V30 {
 		resp := res.Packer.(*cmpp.Cmpp3ConnRspPkt)
 		auth, authIsmg := sm.LoginAuthAvailable(account, pkg.Timestamp, pkg.SrcAddr, pkg.AuthSrc)
 		if !auth {

@@ -9,16 +9,16 @@ import (
 	"time"
 )
 
+var Clients = make(map[string]*pkg.CmppClientManager, 0)
+
 type CmppClient struct {
-	cfg     *config.CmppClientConfig
-	Logger  *zap.Logger
-	Clients map[string]*pkg.CmppClientManager
+	cfg    *config.CmppClientConfig
+	Logger *zap.Logger
 }
 
 func (s *CmppClient) Init(logger *zap.Logger) {
 	s.cfg = config.ConfigObj.ClientConfig
 	s.Logger = logger
-	s.Clients = make(map[string]*pkg.CmppClientManager, 0)
 }
 
 func (s *CmppClient) Start() (err error) {
@@ -56,7 +56,7 @@ func (s *CmppClient) Start() (err error) {
 			continue
 		}
 		key := strings.Join([]string{addr, account.Username}, "_")
-		s.Clients[key] = cm
+		Clients[key] = cm
 	}
 
 	if errCount == 0 {
@@ -66,7 +66,7 @@ func (s *CmppClient) Start() (err error) {
 }
 
 func (s *CmppClient) Stop() error {
-	for _, client := range s.Clients {
+	for _, client := range Clients {
 		client.Disconnect()
 	}
 	return nil

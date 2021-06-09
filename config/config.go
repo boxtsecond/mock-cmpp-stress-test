@@ -6,10 +6,24 @@ import (
 	"mock-cmpp-stress-test/utils/log"
 )
 
+type TextMessages struct {
+	Extend  string `toml:"extend"`
+	Content string `toml:"content"`
+	Phone   string `toml:"phone"`
+}
+
+type StressTestWorker struct {
+	Name         string `toml:"name"`
+	Concurrency  uint64 `toml:"concurrency"`
+	DurationTime uint64 `toml:"duration_time"`
+	TotalNum     uint64 `toml:"total_num"`
+	Sleep        uint64 `toml:"sleep"`
+}
+
 type StressTestConfig struct {
-	Concurrency  uint `toml:"concurrency"`
-	DurationTime uint `toml:"duration_time"`
-	TotalNum     uint `toml:"total_num"`
+	Enable   bool                `toml:"enable"`
+	Workers  *[]StressTestWorker `toml:"workers"`
+	Messages *[]TextMessages     `toml:"messages"`
 }
 
 type RedisConfig struct {
