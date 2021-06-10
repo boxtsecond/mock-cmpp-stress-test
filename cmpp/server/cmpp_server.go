@@ -3,7 +3,7 @@ package server
 import (
 	cmpp "github.com/bigwhite/gocmpp"
 	"go.uber.org/zap"
-
+	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
 	"time"
 )
@@ -13,15 +13,15 @@ type CmppServer struct {
 	Logger *zap.Logger
 }
 
-var Cmpp2DeliverChan chan *cmpp.Cmpp2DeliverReqPkt
-var Cmpp3DeliverChan chan *cmpp.Cmpp3DeliverReqPkt
-
 func (s *CmppServer) Init(logger *zap.Logger) {
 	s.cfg = config.ConfigObj.ServerConfig
 	s.Logger = logger
 }
 
 func (s *CmppServer) Start() error {
+	cm := &pkg.CmppServerManager{}
+	s.Logger.Info("CmppServer", zap.Any("123", cm))
+
 	return nil
 }
 
@@ -44,12 +44,12 @@ func (s *CmppServer) StartDeliver() {
 
 	for {
 		select {
-		case cmpp2Deliver := <-Cmpp2DeliverChan:
+		case cmpp2Deliver := <-pkg.Cmpp2DeliverChan:
 			cmpp2DeliverPkgs = append(cmpp2DeliverPkgs, cmpp2Deliver)
 			if len(cmpp2DeliverPkgs) >= 100 {
 
 			}
-		case cmpp3Deliver := <-Cmpp3DeliverChan:
+		case cmpp3Deliver := <-pkg.Cmpp3DeliverChan:
 			cmpp3DeliverPkgs = append(cmpp3DeliverPkgs, cmpp3Deliver)
 			if len(cmpp3DeliverPkgs) >= 100 {
 

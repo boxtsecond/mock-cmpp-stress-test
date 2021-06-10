@@ -5,7 +5,6 @@ import (
 	cmpp "github.com/bigwhite/gocmpp"
 	cmpputils "github.com/bigwhite/gocmpp/utils"
 	"go.uber.org/zap"
-	"mock-cmpp-stress-test/cmpp/server"
 	"mock-cmpp-stress-test/config"
 	"mock-cmpp-stress-test/utils/log"
 	"net"
@@ -215,6 +214,10 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 // =====================CmppClient=====================
 
 // =====================CmppServer=====================
+
+var Cmpp2DeliverChan chan *cmpp.Cmpp2DeliverReqPkt
+var Cmpp3DeliverChan chan *cmpp.Cmpp3DeliverReqPkt
+
 func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
@@ -254,7 +257,7 @@ func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (
 			zap.String("RemoteAddr", addr))
 
 		// 返回状态报告
-		server.Cmpp2DeliverChan <- deliverPkg
+		Cmpp2DeliverChan <- deliverPkg
 	}
 
 	resp.MsgId = msgId
@@ -300,7 +303,7 @@ func (sm *CmppServerManager) Cmpp3Submit(req *cmpp.Packet, res *cmpp.Response) (
 			zap.String("RemoteAddr", addr))
 
 		// 返回状态报告
-		server.Cmpp3DeliverChan <- deliverPkg
+		Cmpp3DeliverChan <- deliverPkg
 	}
 
 	resp.MsgId = msgId
