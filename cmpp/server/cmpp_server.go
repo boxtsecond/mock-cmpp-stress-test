@@ -3,6 +3,7 @@ package server
 import (
 	cmpp "github.com/bigwhite/gocmpp"
 	"go.uber.org/zap"
+	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
 	"time"
 )
@@ -21,7 +22,14 @@ func (s *CmppServer) Init(logger *zap.Logger) {
 }
 // 连接cmpp客户端
 func (s *CmppServer) Start() error {
+	csm := pkg.CmppServerManager{}
+	if err := csm.Init(s.cfg.Version , s.cfg.IP) ;err!= nil {
+		s.Logger.Error("Cmpp Server Init Error",
+			zap.Error(err))
+		return err
+	}
 
+	//csm.Init()
 	return nil
 }
 

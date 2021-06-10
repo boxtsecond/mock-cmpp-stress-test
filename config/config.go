@@ -37,7 +37,7 @@ type RedisConfig struct {
 
 type Config struct {
 	ClientConfig *CmppClientConfig `toml:"cmpp_client"`
-	ServerConfig *CmppServerConfig `toml:"cmpp_server"`
+	ServerConfig *CmppServerConfig `toml:"test"`
 	StressTest   *StressTestConfig `toml:"stress_test"`
 	Log          *log.Config       `toml:"log"`
 	Redis        *RedisConfig      `toml:"redis"`

@@ -1,15 +1,12 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/client"
-	"mock-cmpp-stress-test/stress_test_service"
-
 	"mock-cmpp-stress-test/cmpp/server"
-
 	"mock-cmpp-stress-test/config"
+	"mock-cmpp-stress-test/stress_test_service"
 	"mock-cmpp-stress-test/utils/log"
 	"os"
 	"os/signal"
@@ -27,7 +24,6 @@ var Services = []Service{
 	// CMPP 客户端
 	new(client.CmppClient),
 	// CMPP 服务端
-
 	new(server.CmppServer),
 	// redis 服务
 	//new(client.CmppClient),

@@ -1,6 +1,8 @@
 package pkg
 
-import cmpp "github.com/bigwhite/gocmpp"
+import (
+	cmpp "github.com/bigwhite/gocmpp"
+)
 
 // =====================CmppClient=====================
 func (cm *CmppClientManager) CmppTerminateReq(pkg *cmpp.CmppTerminateReqPkt) error {
