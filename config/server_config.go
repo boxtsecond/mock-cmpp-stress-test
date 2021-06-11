@@ -1,7 +1,7 @@
 package config
 
 type CmppServerAuth struct {
-	Username string `toml:"username"`
+	UserName string `toml:"username"`
 	Password string `toml:"password"`
 	SpId     string `toml:"sp_id"`
 	SpCode   string `toml:"sp_code"`

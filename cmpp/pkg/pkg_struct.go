@@ -17,7 +17,7 @@ const (
 // cmpp client
 type CmppClientManager struct {
 	// setting
-	Addr     string        // cmpp server address
+	Addr     string        // cmpp test address
 	Version  cmpp.Type     // cmpp version
 	UserName string        // cmpp connect username
 	Password string        // cmpp connect password
@@ -31,16 +31,18 @@ type CmppClientManager struct {
 	Cache     *cache.Cache
 }
 
-// cmpp server
+// cmpp test
 type CmppServerManager struct {
 	// setting
 	Addr          string    // cmpp client address
 	Version       cmpp.Type // cmpp version
 	heartbeat     time.Duration
 	maxNoRespPkgs int32
+	Stop               chan struct{} // 服务停止信号
 
-	ConnMap map[string]*Conn
-	UserMap map[string]*Conn
+	// Server *cmpp.Server // cmpp server
+	ConnMap map[string]*Conn  // 连接池
+	UserMap map[string]*Conn  // 用户map
 }
 
 type Conn struct {
@@ -84,6 +86,7 @@ func (cm *CmppClientManager) SplitLongSms(content string) [][]byte {
 	}
 	return chunks
 }
+
 
 func GetMsgId(spId string, seqId uint32) (uint64, error) {
 	now := time.Now()

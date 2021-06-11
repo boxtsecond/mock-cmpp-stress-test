@@ -8,6 +8,7 @@ import (
 	cmpputils "github.com/bigwhite/gocmpp/utils"
 	"go.uber.org/zap"
 	_log "log"
+	"mock-cmpp-stress-test/cmpp/cron_cache"
 	"mock-cmpp-stress-test/config"
 	"mock-cmpp-stress-test/utils/cache"
 	"mock-cmpp-stress-test/utils/log"
@@ -109,21 +110,30 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 	sm.Addr = addr
 	sm.Version = v
 
+
 	cfg := config.ConfigObj.ServerConfig
-	for _, auth := range *cfg.Auths {
-		sm.ConnMap[auth.Username] = &Conn{
-			UserName: auth.Username,
-			password: auth.Password,
-			spId:     auth.SpId,
-			spCode:   auth.SpCode,
-		}
-	}
+	// 读取账户？？有了缓存是不是其实没用了
+	// sm.UserMap =
+	//for _, auth := range *cfg.Auths {
+	//	sm.UserMap[auth.UserName] = &Conn{
+	//		UserName: auth.UserName,
+	//		password: auth.Password,
+	//		spId:     auth.SpId,
+	//		spCode:   auth.SpCode,
+	//	}
+	//}
 	sm.heartbeat = time.Duration(cfg.HeartBeat) * time.Second
 	sm.maxNoRespPkgs = int32(cfg.MaxNoRspPkgs)
+	sm.ConnMap = make(map[string]*Conn)
+	// sm.Server = cmpp.NewServer()
+
 	return nil
 }
 
 func (sm *CmppServerManager) Start() error {
+	// 启动定时
+	cron_cache.Start()
+	// 启动端口服务
 	err := cmpp.ListenAndServe(sm.Addr, sm.Version,
 		sm.heartbeat,
 		sm.maxNoRespPkgs,
@@ -141,11 +151,11 @@ func (sm *CmppServerManager) Start() error {
 	return nil
 }
 
-func (sm *CmppServerManager) LoginAuthAvailable(account *Conn, reqTime uint32, username, reqAuthSrc string) (bool, string) {
+func (sm *CmppServerManager) LoginAuthAvailable(account *config.CmppServerAuth, reqTime uint32, username, reqAuthSrc string) (bool, string) {
 
 	authSrc := md5.Sum(bytes.Join([][]byte{[]byte(cmpputils.OctetString(username, 6)),
 		make([]byte, 9),
-		[]byte(account.password),
+		[]byte(account.Password),
 		[]byte(cmpputils.TimeStamp2Str(reqTime))},
 		nil))
 	if reqAuthSrc != string(authSrc[:]) {
@@ -156,7 +166,7 @@ func (sm *CmppServerManager) LoginAuthAvailable(account *Conn, reqTime uint32, u
 
 	authIsmg := md5.Sum(bytes.Join([][]byte{{byte(0)},
 		authSrc[:],
-		[]byte(account.password)},
+		[]byte(account.Password)},
 		nil))
 	return true, string(authIsmg[:])
 }
@@ -164,8 +174,8 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
 	pkg := req.Packer.(*cmpp.CmppConnReqPkt)
-	account, ok := sm.UserMap[pkg.SrcAddr]
-	if !ok {
+	account  := cron_cache.GetAccountInfo(pkg.SrcAddr)
+	if account == nil {
 		log.Logger.Error("[CmppServer][Connect] Error: invalid username",
 			zap.String("UserName", pkg.SrcAddr))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnInvalidSrcAddr]
@@ -195,12 +205,11 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 			resp.AuthIsmg = authIsmg
 		}
 	}
-
 	sm.ConnMap[addr] = &Conn{
 		UserName: pkg.SrcAddr,
-		password: account.password,
-		spId:     account.spId,
-		spCode:   account.spCode,
+		password: account.Password,
+		spId:     account.SpId,
+		spCode:   account.SpCode,
 	}
 
 	log.Logger.Info("[CmppServer][Login] Success",
@@ -214,13 +223,17 @@ func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet,
 	switch pkg.Packer.(type) {
 	case *cmpp.CmppConnReqPkt:
 		return sm.Connect(pkg, res)
-
+	case *cmpp.Cmpp2SubmitRspPkt: // 处理cmpp心跳包
+		return sm.DealCmppActiveTestReq(pkg ,res)
 	case *cmpp.Cmpp2SubmitReqPkt:
 		return sm.Cmpp2Submit(pkg, res)
 	case *cmpp.Cmpp3SubmitReqPkt:
 		return sm.Cmpp3Submit(pkg, res)
 
-	//case *pkg.CmppTerminateReqPkg:
+	//case *cmpp.CmppActiveTestRespPkg: //
+	//	reqObj := req.(*pkg.CmppActiveTestRespPkg)
+	//	return dealCmppActiveTestResp(conn, reqObj)
+		//case *pkg.CmppTerminateReqPkg:
 	//	reqObj := req.(*pkg.CmppTerminateReqPkg)
 	//	respObj := resp.(*pkg.CmppTerminateRespPkg)
 	//	return dealCmppTerminate(conn, reqObj, respObj)
@@ -228,15 +241,9 @@ func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet,
 	//	reqObj := req.(*pkg.CmppTerminateRespPkg)
 	//	return dealCmppTerminateResp(conn, reqObj)
 	//
-	//case *pkg.CmppActiveTestReqPkg:
-	//	reqObj := req.(*pkg.CmppActiveTestReqPkg)
-	//	respObj := resp.(*pkg.CmppActiveTestRespPkg)
-	//	return dealCmppActiveTest(conn, reqObj, respObj)
-	//case *pkg.CmppActiveTestRespPkg:
-	//	reqObj := req.(*pkg.CmppActiveTestRespPkg)
-	//	return dealCmppActiveTestResp(conn, reqObj)
 
 	default:
+
 	}
 	return false, nil
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/client"
-	"mock-cmpp-stress-test/cmpp/server"
 	"mock-cmpp-stress-test/config"
 	"mock-cmpp-stress-test/stress_test_service"
 	"mock-cmpp-stress-test/utils/log"
@@ -22,14 +21,15 @@ type Service interface {
 }
 
 var Services = []Service{
+	// CMPP 服务端
+	// new(server.CmppServer),
 	// CMPP 客户端
 	new(client.CmppClient),
-	// CMPP 服务端
-	new(server.CmppServer),
 	// redis 服务
 	//new(client.CmppClient),
 	// 压测服务
 	new(stress_test_service.StressTest),
+
 }
 
 func Init() error {

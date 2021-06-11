@@ -89,10 +89,10 @@ func (cm *CmppClientManager) Cmpp2SubmitResp(resp *cmpp.Cmpp2SubmitRspPkt) error
 	defer cm.Cache.Delete(key)
 
 	if data == "" {
-		return errors.New("get cache error")
+		return errors.New("get cron_cache error")
 	}
 
-	// TODO: Add statistics, cache or redis
+	// TODO: Add statistics, cron_cache or redis
 	if resp.Result == 0 {
 		log.Logger.Info("[CmppClient][Cmpp2SubmitResp] Success",
 			zap.String("Addr", cm.Addr),
@@ -198,10 +198,10 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 	defer cm.Cache.Delete(key)
 
 	if data == "" {
-		return errors.New("get cache error")
+		return errors.New("get cron_cache error")
 	}
 
-	// TODO: Add statistics, cache or redis
+	// TODO: Add statistics, cron_cache or redis
 	if resp.Result == 0 {
 		log.Logger.Info("[CmppClient][Cmpp3SubmitResp] Success", zap.Uint32("SeqId", resp.SeqId), zap.Uint64("MsgId", resp.MsgId))
 	} else {
@@ -217,6 +217,9 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 
 var Cmpp2DeliverChan chan *cmpp.Cmpp2DeliverReqPkt
 var Cmpp3DeliverChan chan *cmpp.Cmpp3DeliverReqPkt
+var Cmpp2SubmitRspChan chan *cmpp.Cmpp2SubmitRspPkt
+var Cmpp3SubmitRspChan chan *cmpp.Cmpp2SubmitRspPkt
+
 
 func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
@@ -237,7 +240,7 @@ func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (
 		log.Logger.Error("[CmppServer][Cmpp2Submit] GetMsgId Error", zap.Error(err))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
 	}
-
+	// 构造一个回执
 	for _, phone := range pkg.DestTerminalId {
 		deliverPkg := &cmpp.Cmpp2DeliverReqPkt{
 			MsgId:            msgId,
@@ -257,9 +260,10 @@ func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (
 			zap.String("RemoteAddr", addr))
 
 		// 返回状态报告
-		Cmpp2DeliverChan <- deliverPkg
+		// Cmpp2DeliverChan <- deliverPkg
+		res.Packer = deliverPkg
+		res.Conn = req.Conn
 	}
-
 	resp.MsgId = msgId
 	return false, nil
 }
