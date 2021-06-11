@@ -38,9 +38,11 @@ type CmppServerManager struct {
 	Version       cmpp.Type // cmpp version
 	heartbeat     time.Duration
 	maxNoRespPkgs int32
+	Stop               chan struct{} // 服务停止信号
 
-	ConnMap map[string]*Conn
-	UserMap map[string]*Conn
+	// Server *cmpp.Server // cmpp server
+	ConnMap map[string]*Conn  // 连接池
+	UserMap map[string]*Conn  // 用户map
 }
 
 type Conn struct {

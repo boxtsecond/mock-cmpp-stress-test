@@ -31,7 +31,7 @@ func (cm *CmppClientManager) Cmpp3DeliverReq(pkg *cmpp.Cmpp3DeliverReqPkt) error
 
 // =====================CmppServer=====================
 
-func (sm *CmppServerManager) Cmpp2Deliver(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
+func (sm *CmppServerManager) Cmpp2Deliver(req *cmpp.Packet , res *cmpp.Response) (bool, error) {
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
 
 	pkg := req.Packer.(*cmpp.Cmpp2DeliverReqPkt)
@@ -46,10 +46,9 @@ func (sm *CmppServerManager) Cmpp2Deliver(req *cmpp.Packet, res *cmpp.Response) 
 
 	msgId, err := GetMsgId(account.spId, pkg.SeqId)
 	if err != nil {
-		log.Logger.Error("[CmppServer][Cmpp2Submit] GetMsgId Error", zap.Error(err))
+		log.Logger.Error("[CmppServer][Cmpp2Deliver] GetMsgId Error", zap.Error(err))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
 	}
-
 	resp.MsgId = msgId
 	return false, nil
 }

@@ -3,6 +3,7 @@ package stress_test_service
 import (
 	"context"
 	"errors"
+	"fmt"
 	cmpp "github.com/bigwhite/gocmpp"
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/client"
@@ -119,6 +120,9 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 }
 
 func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
+	for k  := range  client.Clients {
+		fmt.Println("worker.name" ,k , worker.Name)
+	}
 	cmppClient, ok := client.Clients[worker.Name]
 	if !ok {
 		st.Logger.Error("[StressTest][StartWorkerByTotalNum] Error", zap.Error(errors.New("can't find cmpp client")))

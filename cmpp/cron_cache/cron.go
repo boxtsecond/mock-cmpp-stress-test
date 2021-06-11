@@ -1,4 +1,4 @@
-package cron
+package cron_cache
 
 import (
 	"github.com/jasonlvhit/gocron"
