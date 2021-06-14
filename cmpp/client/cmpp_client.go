@@ -58,6 +58,8 @@ func (s *CmppClient) Start() (err error) {
 		}
 		key := strings.Join([]string{addr, account.Username}, "_")
 		Clients[key] = cm
+		// 启动一个携程心跳检
+		go cm.KeepAlive()
 	}
 
 	if errCount == 0 {
@@ -94,8 +96,11 @@ func (s *CmppClient) Receive() {
 							zap.String("UserName", cm.UserName),
 							zap.String("Address", cm.Addr),
 							zap.Error(err))
+						// 直接把线程停了？ 丢弃继续接包
 						break
+						// continue
 					}
+
 					log.Logger.Error("[CmppClient][ReceivePkgs] Error",
 						zap.String("UserName", cm.UserName),
 						zap.String("Address", cm.Addr),

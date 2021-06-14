@@ -89,10 +89,10 @@ func (cm *CmppClientManager) Cmpp2SubmitResp(resp *cmpp.Cmpp2SubmitRspPkt) error
 	defer cm.Cache.Delete(key)
 
 	if data == "" {
-		return errors.New("get cron_cache error")
+		return errors.New("get cache error")
 	}
 
-	// TODO: Add statistics, cron_cache or redis
+	// TODO: Add statistics, cache or redis
 	if resp.Result == 0 {
 		log.Logger.Info("[CmppClient][Cmpp2SubmitResp] Success",
 			zap.String("Addr", cm.Addr),
@@ -215,30 +215,31 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 
 // =====================CmppServer=====================
 
-var Cmpp2DeliverChan chan *cmpp.Cmpp2DeliverReqPkt
-var Cmpp3DeliverChan chan *cmpp.Cmpp3DeliverReqPkt
-var Cmpp2SubmitRspChan chan *cmpp.Cmpp2SubmitRspPkt
-var Cmpp3SubmitRspChan chan *cmpp.Cmpp2SubmitRspPkt
+var Cmpp2DeliverChan = make(chan *cmpp.Cmpp2DeliverReqPkt , 100 )
+var Cmpp3DeliverChan  = make(chan *cmpp.Cmpp3DeliverReqPkt,100 )
 
 
 func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
-	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
+	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).String()
 
 	pkg := req.Packer.(*cmpp.Cmpp2SubmitReqPkt)
 	resp := res.Packer.(*cmpp.Cmpp2SubmitRspPkt)
-
-	account, ok := sm.ConnMap[addr]
+	account, ok := sm.UserMap[addr]
 	if !ok {
 		log.Logger.Error("[CmppServer][Cmpp2Submit] Error",
 			zap.String("Phone", pkg.DestTerminalId[0]),
 			zap.String("RemoteAddr", addr))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
 	}
-
 	msgId, err := GetMsgId(account.spId, pkg.SeqId)
 	if err != nil {
 		log.Logger.Error("[CmppServer][Cmpp2Submit] GetMsgId Error", zap.Error(err))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
+	}
+	// 写cache,记录一下发送的链接, 会不会造成内存泄漏？
+	setCacheErr := sm.Cache.Set(strconv.Itoa(int(msgId)) , strings.Join([]string{addr, account.UserName, account.spId, account.spCode}, ","))
+	if setCacheErr != nil {
+		log.Logger.Error("[CmppClient][Cmpp2Submit][SetCache] Error:", zap.Error(setCacheErr))
 	}
 	// 构造一个回执
 	for _, phone := range pkg.DestTerminalId {
@@ -256,25 +257,26 @@ func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (
 		}
 		log.Logger.Info("[CmppServer][Cmpp2Submit] Success",
 			zap.String("Phone", phone),
-			zap.String("MsgId", string(msgId)),
+			zap.Uint64("MsgId", msgId),
 			zap.String("RemoteAddr", addr))
-
 		// 返回状态报告
-		// Cmpp2DeliverChan <- deliverPkg
-		res.Packer = deliverPkg
-		res.Conn = req.Conn
+		sm.SendCmpp2DeliverPkg(deliverPkg)
 	}
 	resp.MsgId = msgId
 	return false, nil
 }
 
+func (sm *CmppServerManager) SendCmpp2DeliverPkg(pkg *cmpp.Cmpp2DeliverReqPkt) {
+	Cmpp2DeliverChan <- pkg
+}
+
 func (sm *CmppServerManager) Cmpp3Submit(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
-	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
+	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).String()
 
 	pkg := req.Packer.(*cmpp.Cmpp3SubmitReqPkt)
 	resp := res.Packer.(*cmpp.Cmpp3SubmitRspPkt)
 
-	account, ok := sm.ConnMap[addr]
+	account, ok := sm.UserMap[addr]
 	if !ok {
 		log.Logger.Error("[CmppServer][Cmpp2Submit] Error",
 			zap.String("Phone", pkg.DestTerminalId[0]),

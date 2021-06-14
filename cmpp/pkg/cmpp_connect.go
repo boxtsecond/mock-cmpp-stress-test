@@ -74,9 +74,9 @@ func (cm *CmppClientManager) Disconnect() {
 func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
 	switch p := pkg.(type) {
 	case *cmpp.CmppActiveTestReqPkt:
-		return cm.CmppActiveTestReq(p)
+		return cm.CmppActiveTestReq(p) // 收到来自服务端的心跳检测包
 	case *cmpp.CmppActiveTestRspPkt:
-		return cm.CmppActiveTestRsp(p)
+		return cm.CmppActiveTestRsp(p) // 收到服务端回复的心跳检测包
 
 	case *cmpp.Cmpp2SubmitRspPkt:
 		return cm.Cmpp2SubmitResp(p)
@@ -90,9 +90,44 @@ func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
 	default:
 		typeErr := errors.New("unhandled pkg type")
 		log.Logger.Error("[CmppClient][ReceivePkgs] Error",
-			zap.Error(typeErr))
+			zap.Error(typeErr),
+			zap.Any("pkg.Type" ,p))
 	}
 	return nil
+}
+
+// 客户端发送心跳检测请求
+func  (c *CmppClientManager) KeepAlive() {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Logger.Error("cmpp: keepAlive panic recover",zap.Any("err" , err))
+		}
+	}()
+
+	tk := time.NewTicker(10 * time.Second)  // 每10秒发一个心跳包
+	defer tk.Stop()
+
+	for {
+
+		if !c.Connected {
+			continue
+		}
+		//发送心跳检测包
+		err := c.SendCmppActiveTestReq(&cmpp.CmppActiveTestReqPkt{})
+		if err != nil {
+			log.Logger.Error("cmpp: check alive error:", zap.String("err" ,err.Error()) ,zap.String("UserName" , c.UserName) )
+		}
+
+		select {
+		case <-tk.C:
+			if c.Retries >= 3  {
+				log.Logger.Error("cmpp: keepalive error, reconnect", zap.String("UserName", c.UserName))
+				c.Connect()
+				return
+			}
+		}
+	}
+
 }
 
 // =====================CmppClient=====================
@@ -109,7 +144,8 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 
 	sm.Addr = addr
 	sm.Version = v
-
+	sm.Cache = (&cache.Cache{}).New(1e4)
+	// go sm.Cache.StartRetry()
 
 	cfg := config.ConfigObj.ServerConfig
 	// 读取账户？？有了缓存是不是其实没用了
@@ -122,10 +158,11 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 	//		spCode:   auth.SpCode,
 	//	}
 	//}
-	sm.heartbeat = time.Duration(cfg.HeartBeat) * time.Second
+	sm.heartbeat = time.Duration(cfg.HeartBeat) * time.Second // 每秒心跳检测
 	sm.maxNoRespPkgs = int32(cfg.MaxNoRspPkgs)
-	sm.ConnMap = make(map[string]*Conn)
-	// sm.Server = cmpp.NewServer()
+	sm.ConnMap = make(map[string]*cmpp.Conn)
+	sm.UserMap = make(map[string]*Conn)
+
 
 	return nil
 }
@@ -133,7 +170,7 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 func (sm *CmppServerManager) Start() error {
 	// 启动定时
 	cron_cache.Start()
-	// 启动端口服务
+	// TODO 启动端口服务,这里会阻塞，后面的日志打不出来。
 	err := cmpp.ListenAndServe(sm.Addr, sm.Version,
 		sm.heartbeat,
 		sm.maxNoRespPkgs,
@@ -171,8 +208,7 @@ func (sm *CmppServerManager) LoginAuthAvailable(account *config.CmppServerAuth, 
 	return true, string(authIsmg[:])
 }
 func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
-	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
-
+	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).String()
 	pkg := req.Packer.(*cmpp.CmppConnReqPkt)
 	account  := cron_cache.GetAccountInfo(pkg.SrcAddr)
 	if account == nil {
@@ -205,12 +241,8 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 			resp.AuthIsmg = authIsmg
 		}
 	}
-	sm.ConnMap[addr] = &Conn{
-		UserName: pkg.SrcAddr,
-		password: account.Password,
-		spId:     account.SpId,
-		spCode:   account.SpCode,
-	}
+	sm.ConnMap[addr] = req.Conn
+	sm.UserMap[addr] = &Conn{UserName: account.UserName , password: account.Password ,spCode: account.SpCode , spId: account.SpId}
 
 	log.Logger.Info("[CmppServer][Login] Success",
 		zap.String("UserName", pkg.SrcAddr),
@@ -221,31 +253,28 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 
 func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet, l *_log.Logger) (bool, error) {
 	switch pkg.Packer.(type) {
-	case *cmpp.CmppConnReqPkt:
+	case *cmpp.CmppConnReqPkt: // 处理cmpp连接请求
 		return sm.Connect(pkg, res)
-	case *cmpp.Cmpp2SubmitRspPkt: // 处理cmpp心跳包
-		return sm.DealCmppActiveTestReq(pkg ,res)
+	//case *cmpp.CmppActiveTestReqPkt: // 处理来自客户端的心跳检测请求
+	//	return sm.CmppActiveTestReq(pkg ,res)
+	//case *cmpp.CmppActiveTestRspPkt: // 客户端回复的心跳检测包
+	//	return sm.CmppActiveTestRsp(pkg ,res )
 	case *cmpp.Cmpp2SubmitReqPkt:
 		return sm.Cmpp2Submit(pkg, res)
 	case *cmpp.Cmpp3SubmitReqPkt:
 		return sm.Cmpp3Submit(pkg, res)
-
-	//case *cmpp.CmppActiveTestRespPkg: //
-	//	reqObj := req.(*pkg.CmppActiveTestRespPkg)
-	//	return dealCmppActiveTestResp(conn, reqObj)
-		//case *pkg.CmppTerminateReqPkg:
-	//	reqObj := req.(*pkg.CmppTerminateReqPkg)
-	//	respObj := resp.(*pkg.CmppTerminateRespPkg)
-	//	return dealCmppTerminate(conn, reqObj, respObj)
-	//case *pkg.CmppTerminateRespPkg:
-	//	reqObj := req.(*pkg.CmppTerminateRespPkg)
-	//	return dealCmppTerminateResp(conn, reqObj)
-	//
-
+	case *cmpp.CmppTerminateReqPkt: // 关闭连接
+		// return  sm.CmppTerminate(pkg ,res)
+		return false , nil
 	default:
 
 	}
 	return false, nil
 }
 
+func  (sm *CmppServerManager) Stop()  {
+	for  _, conn :=range sm.ConnMap {
+		conn.Close()
+	}
+}
 // =====================CmppServer=====================
