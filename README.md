@@ -5,9 +5,13 @@
 ## 目录
 - [项目说明](#项目说明)
 - [参数详解](#参数详解)
+- [功能说明](#功能说明)
 
 ## 项目说明
 mock-cmpp-stress-test 是集 cmpp客户端、cmpp服务端 的轻量级模拟压测工具，可单独模拟 cmpp客户端 或 cmpp服务端。提供压测数据图表，或可使用Redis统计维度更丰富的数据。配置灵活，支持二次开发。
+
+mock-cmpp-stress-test 是针对CMPP协议下短信发送服务的轻量级压测工具。支持CMPP客户端、服务端独立部署，分别模拟高并发场景下的大量用户请求和渠道返回。压测结果使用HTML格式输出数据图表，亦可扩展redis用于更细粒度压测结果数据存储。详细配置如下，支持二次开发。
+
 
 ## 参数详解
 ```toml
@@ -66,10 +70,10 @@ heartbeat = 1
 max_no_resp_pkgs = 3
 # cmpp 服务端验证账号信息（可对照cmpp_client.accounts）
 [[cmpp_server.auths]]
-username = "test"
+username = "200001"
 password = "test123"
-sp_id = ""
-sp_code = ""
+sp_id = "1000"
+sp_code = "1000"
 ##################### cmpp 服务端配置模块 #####################
 
 ##################### 压力测试配置模块 #####################
@@ -110,16 +114,17 @@ wait = true
 enable = true
 ##################### redis配置模块 ##################### 
 ```
-
+### 功能说明：
+- [x] CMPP服务端
+    - [x] 接收CMPP连接，校验用户名密码
+    - [x] 接收来自客户端各类型数据包并处理
+    - [x] 推送回执给指定客户端
+    - [ ] 模拟上行，并推送给指定客户端
 
 cmpp连接库：https://github.com/bigwhite/gocmpp
 图表库：https://github.com/go-echarts/go-echarts/blob/master/README_CN.md 
 
-服务端核心功能：
-- 接收CMPP连接
-- 模拟回执，上行推送
-- 回执上行推送比率可配置
-- 回复来自客户端的心跳包
+
 
 TODO List
 - Cache 溢出 && Retry
