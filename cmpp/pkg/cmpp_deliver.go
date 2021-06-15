@@ -3,8 +3,13 @@ package pkg
 import (
 	cmpp "github.com/bigwhite/gocmpp"
 	"go.uber.org/zap"
+	"strings"
+
+	//"golang.org/x/text/width"
 	"mock-cmpp-stress-test/utils/log"
-	"net"
+	"strconv"
+
+	//"net"
 )
 
 // =====================CmppClient=====================
@@ -30,58 +35,90 @@ func (cm *CmppClientManager) Cmpp3DeliverReq(pkg *cmpp.Cmpp3DeliverReqPkt) error
 // =====================CmppClient=====================
 
 // =====================CmppServer=====================
-
-func (sm *CmppServerManager) Cmpp2Deliver(req *cmpp.Packet , res *cmpp.Response) (bool, error) {
-	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
-
-	pkg := req.Packer.(*cmpp.Cmpp2DeliverReqPkt)
-	resp := res.Packer.(*cmpp.Cmpp2SubmitRspPkt)
-
-	account, ok := sm.ConnMap[addr]
-	if !ok {
-		log.Logger.Error("[CmppServer][Cmpp2Deliver] Error",
-			zap.String("RemoteAddr", addr))
-		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
+func  (sm *CmppServerManager) BatchCmpp2Deliver (pkgs []*cmpp.Cmpp2DeliverReqPkt)  {
+	for _ , each := range pkgs {
+		sm.Cmpp2Deliver(each)
 	}
-
-	msgId, err := GetMsgId(account.spId, pkg.SeqId)
-	if err != nil {
-		log.Logger.Error("[CmppServer][Cmpp2Deliver] GetMsgId Error", zap.Error(err))
-		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
-	}
-	resp.MsgId = msgId
-	return false, nil
 }
 
-func (sm *CmppServerManager) Cmpp3Deliver(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
-	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
-
-	pkg := req.Packer.(*cmpp.Cmpp3SubmitReqPkt)
-	resp := res.Packer.(*cmpp.Cmpp3SubmitRspPkt)
-
-	account, ok := sm.ConnMap[addr]
-	if !ok {
-		log.Logger.Error("[CmppServer][Cmpp2Submit] Error",
-			zap.String("Phone", pkg.DestTerminalId[0]),
-			zap.String("RemoteAddr", addr))
-		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
+func  (sm *CmppServerManager) BatchCmpp3Deliver (pkgs []*cmpp.Cmpp2DeliverReqPkt)  {
+	for _ , each := range pkgs {
+		sm.Cmpp3Deliver(each)
 	}
-
-	msgId, err := GetMsgId(account.spId, pkg.SeqId)
-	if err != nil {
-		log.Logger.Error("[CmppServer][Cmpp2Submit] GetMsgId Error", zap.Error(err))
-		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
-	}
-
-	for _, phone := range pkg.DestTerminalId {
-		log.Logger.Info("[CmppServer][Cmpp2Submit] Success",
-			zap.String("Phone", phone),
-			zap.String("MsgId", string(msgId)),
-			zap.String("RemoteAddr", addr))
-	}
-
-	resp.MsgId = msgId
-	return false, nil
 }
+
+// 推送回执给指定连接
+func (sm *CmppServerManager) Cmpp2Deliver(pkg *cmpp.Cmpp2DeliverReqPkt) error {
+	key  := strconv.Itoa(int(pkg.MsgId))
+	value := sm.Cache.Get(key)
+	addr := strings.Split(value , ",")[0]
+	defer sm.Cache.Delete(key)
+	if addr != ""{
+		if conn  , ok := sm.ConnMap[addr] ;  ok {
+			if err := conn.SendPkt(pkg, <-conn.SeqId); err != nil {
+				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Failed" , zap.Error(err),zap.Uint64("MsgId" ,pkg.MsgId) )
+				return  err
+			}else {
+				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Success" ,zap.Uint64("MsgId" ,pkg.MsgId) )
+			}
+		}
+
+	}
+	return  nil
+}
+
+
+// 推送回执给指定连接
+func (sm *CmppServerManager) Cmpp3Deliver(pkg *cmpp.Cmpp2DeliverReqPkt) error {
+	key  := strconv.Itoa(int(pkg.MsgId))
+	value := sm.Cache.Get(key)
+	addr := strings.Split(value , ",")[0]
+	defer sm.Cache.Delete(key)
+	if addr != ""{
+		if conn  , ok := sm.ConnMap[addr] ;  ok {
+			if err := conn.SendPkt(pkg, <-conn.SeqId); err != nil {
+				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Failed" , zap.Error(err),zap.Uint64("MsgId" ,pkg.MsgId) )
+				return  err
+			}else {
+				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Success" ,zap.Uint64("MsgId" ,pkg.MsgId) )
+			}
+		}
+
+	}
+	return  nil
+}
+
+
+//
+//func (sm *CmppServerManager) Cmpp3Deliver(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
+//	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).IP.String()
+//
+//	pkg := req.Packer.(*cmpp.Cmpp3SubmitReqPkt)
+//	resp := res.Packer.(*cmpp.Cmpp3SubmitRspPkt)
+//
+//	account, ok := sm.UserMap[addr]
+//	if !ok {
+//		log.Logger.Error("[CmppServer][Cmpp2Submit] Error",
+//			zap.String("Phone", pkg.DestTerminalId[0]),
+//			zap.String("RemoteAddr", addr))
+//		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
+//	}
+//
+//	msgId, err := GetMsgId(account.spId, pkg.SeqId)
+//	if err != nil {
+//		log.Logger.Error("[CmppServer][Cmpp2Submit] GetMsgId Error", zap.Error(err))
+//		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
+//	}
+//
+//	for _, phone := range pkg.DestTerminalId {
+//		log.Logger.Info("[CmppServer][Cmpp2Submit] Success",
+//			zap.String("Phone", phone),
+//			zap.String("MsgId", string(msgId)),
+//			zap.String("RemoteAddr", addr))
+//	}
+//
+//	resp.MsgId = msgId
+//	return false, nil
+//}
 
 // =====================CmppServer=====================
