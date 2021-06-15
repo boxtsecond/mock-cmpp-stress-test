@@ -40,7 +40,7 @@ func (sm *CmppServerManager) BatchCmpp2Deliver(pkgs []*cmpp.Cmpp2DeliverReqPkt) 
 	}
 }
 
-func (sm *CmppServerManager) BatchCmpp3Deliver(pkgs []*cmpp.Cmpp2DeliverReqPkt) {
+func (sm *CmppServerManager) BatchCmpp3Deliver(pkgs []*cmpp.Cmpp3DeliverReqPkt) {
 	for _, each := range pkgs {
 		sm.Cmpp3Deliver(each)
 	}
@@ -67,7 +67,7 @@ func (sm *CmppServerManager) Cmpp2Deliver(pkg *cmpp.Cmpp2DeliverReqPkt) error {
 }
 
 // 推送回执给指定连接
-func (sm *CmppServerManager) Cmpp3Deliver(pkg *cmpp.Cmpp2DeliverReqPkt) error {
+func (sm *CmppServerManager) Cmpp3Deliver(pkg *cmpp.Cmpp3DeliverReqPkt) error {
 	key := strconv.Itoa(int(pkg.MsgId))
 	value := sm.Cache.Get(key)
 	addr := strings.Split(value, ",")[0]

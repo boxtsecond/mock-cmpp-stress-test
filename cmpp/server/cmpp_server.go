@@ -87,8 +87,8 @@ func (s *CmppServer) StartDeliver() {
 			}
 
 			if len(cmpp3DeliverPkgs) > 0 {
-				//csm.BatchCmpp2Deliver(cmpp3DeliverPkgs)
-				//cmpp2DeliverPkgs = cmpp3DeliverPkgs[:0]
+				csm.BatchCmpp3Deliver(cmpp3DeliverPkgs)
+				cmpp3DeliverPkgs = cmpp3DeliverPkgs[:0]
 			}
 		}
 	}
