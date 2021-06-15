@@ -33,7 +33,7 @@ func (c *Cache) Get(key string) string {
 
 func (c *Cache) Set(key, value string) error {
 	c.Lock.Lock()
-	defer  c.Lock.Unlock()
+	defer c.Lock.Unlock()
 	if c.Size >= MaxSize {
 		return errors.New("Cache capacity is zero! ")
 	}
@@ -44,14 +44,14 @@ func (c *Cache) Set(key, value string) error {
 
 func (c *Cache) Delete(key string) {
 	c.Lock.Lock()
-	defer  c.Lock.Unlock()
+	defer c.Lock.Unlock()
 	c.Size -= 1
 	delete(c.Data, key)
 }
 
 func (c *Cache) Clear() {
 	c.Lock.Lock()
-	defer  c.Lock.Unlock()
+	defer c.Lock.Unlock()
 	c.Data = nil
 }
 
@@ -63,7 +63,7 @@ func (c *Cache) StartRetry() {
 	for {
 		select {
 		case retry := <-RetryQueue:
-			c.Set(retry[0], retry[1])
+			c.RetrySet(retry[0], retry[1])
 		default:
 		}
 	}

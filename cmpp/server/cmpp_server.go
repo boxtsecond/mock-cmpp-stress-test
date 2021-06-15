@@ -9,8 +9,7 @@ import (
 	"time"
 )
 
-
-var csm  pkg.CmppServerManager
+var csm pkg.CmppServerManager
 
 type CmppServer struct {
 	cfg    *config.CmppServerConfig
@@ -21,21 +20,28 @@ func (s *CmppServer) Init(logger *zap.Logger) {
 	s.cfg = config.ConfigObj.ServerConfig
 	s.Logger = logger
 }
+
 // 启动cmpp服务
 func (s *CmppServer) Start() error {
 	defer func() {
 		csm.Stop()
 	}()
-	if !s.cfg.Enable  {
-		return  nil
+	if !s.cfg.Enable {
+		return nil
 	}
-	addr := fmt.Sprintf( "%s:%d" , s.cfg.IP,s.cfg.Port )
-	if err := csm.Init(s.cfg.Version ,addr ) ;err!= nil {
+	addr := fmt.Sprintf("%s:%d", s.cfg.IP, s.cfg.Port)
+	if err := csm.Init(s.cfg.Version, addr); err != nil {
 		s.Logger.Error("Cmpp Server Init Error",
 			zap.Error(err))
 		return err
 	}
-	go csm.Start()
+	go func() {
+		if err := csm.Start(); err != nil {
+			s.Logger.Error("Cmpp Server Start Error",
+				zap.Error(err))
+			csm.Stop()
+		}
+	}()
 	go s.StartDeliver()
 
 	s.Logger.Info("Cmpp Server Start Success")
@@ -48,12 +54,10 @@ func (s *CmppServer) Stop() error {
 	return nil
 }
 
-
-
 func (s *CmppServer) StartDeliver() {
 	defer func() {
 		if err := recover(); err != nil {
-			s.Logger.Error("Deliver Worker Error:", zap.Any("err" , err))
+			s.Logger.Error("Deliver Worker Error:", zap.Any("err", err))
 		}
 	}()
 	cmpp2DeliverPkgs := make([]*cmpp.Cmpp2DeliverReqPkt, 0)
@@ -63,7 +67,6 @@ func (s *CmppServer) StartDeliver() {
 	for {
 		select {
 		case cmpp2Deliver := <-pkg.Cmpp2DeliverChan:
-			fmt.Println("222222","收到一个回执",zap.Any("回执信息：", cmpp2Deliver))
 			cmpp2DeliverPkgs = append(cmpp2DeliverPkgs, cmpp2Deliver)
 			if len(cmpp2DeliverPkgs) >= 100 { // 批次设置为100,推送给指定客户端
 				csm.BatchCmpp2Deliver(cmpp2DeliverPkgs)
@@ -90,4 +93,3 @@ func (s *CmppServer) StartDeliver() {
 		}
 	}
 }
-

@@ -5,7 +5,6 @@ import (
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
-	"mock-cmpp-stress-test/utils/log"
 	"net"
 	"strings"
 	"time"
@@ -25,7 +24,7 @@ func (s *CmppClient) Init(logger *zap.Logger) {
 
 func (s *CmppClient) Start() (err error) {
 	if !s.cfg.Enable {
-		return err
+		return nil
 	}
 
 	version := s.cfg.Version
@@ -58,7 +57,6 @@ func (s *CmppClient) Start() (err error) {
 		}
 		key := strings.Join([]string{addr, account.Username}, "_")
 		Clients[key] = cm
-		// 启动一个携程心跳检
 		go cm.KeepAlive()
 	}
 
@@ -92,23 +90,21 @@ func (s *CmppClient) Receive() {
 						continue
 					}
 					if errCount > 3 {
-						log.Logger.Error("[CmppClient][ReceivePkgs] Error And Return",
+						s.Logger.Error("[CmppClient][ReceivePkgs] Error And Return",
 							zap.String("UserName", cm.UserName),
 							zap.String("Address", cm.Addr),
 							zap.Error(err))
-						// 直接把线程停了？ 丢弃继续接包
-						break
-						// continue
+						return
 					}
 
-					log.Logger.Error("[CmppClient][ReceivePkgs] Error",
+					s.Logger.Error("[CmppClient][ReceivePkgs] Error",
 						zap.String("UserName", cm.UserName),
 						zap.String("Address", cm.Addr),
 						zap.Error(err))
 				}
 				receiveErr := cm.ReceivePkg(receivePkg)
 				if receiveErr != nil {
-					log.Logger.Error("[CmppClient][ReceivePkgs] Error",
+					s.Logger.Error("[CmppClient][ReceivePkgs] Error",
 						zap.String("UserName", cm.UserName),
 						zap.String("Address", cm.Addr),
 						zap.Any("Pkg", receivePkg),

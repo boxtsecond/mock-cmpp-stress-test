@@ -32,7 +32,6 @@ func (cm *CmppClientManager) Init(version, addr, username, password, spId, spCod
 	cm.SpId = spId
 	cm.SpCode = spCode
 	cm.Cache = (&cache.Cache{}).New(1e4)
-	go cm.Cache.StartRetry()
 
 	if cm.Retries == 0 {
 		cm.Retries = defaultRetries
@@ -91,38 +90,41 @@ func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
 		typeErr := errors.New("unhandled pkg type")
 		log.Logger.Error("[CmppClient][ReceivePkgs] Error",
 			zap.Error(typeErr),
-			zap.Any("pkg.Type" ,p))
+			zap.Any("pkg.Type", p))
 	}
 	return nil
 }
 
 // 客户端发送心跳检测请求
-func  (c *CmppClientManager) KeepAlive() {
+func (c *CmppClientManager) KeepAlive() {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Logger.Error("cmpp: keepAlive panic recover",zap.Any("err" , err))
+			log.Logger.Error("[CmppClient][KeepAlive] panic recover", zap.Any("err", err))
 		}
 	}()
 
-	tk := time.NewTicker(10 * time.Second)  // 每10秒发一个心跳包
+	retries := 0
+	tk := time.NewTicker(10 * time.Second) // 每10秒发一个心跳包
 	defer tk.Stop()
 
 	for {
-
 		if !c.Connected {
 			continue
-		}
-		//发送心跳检测包
-		err := c.SendCmppActiveTestReq(&cmpp.CmppActiveTestReqPkt{})
-		if err != nil {
-			log.Logger.Error("cmpp: check alive error:", zap.String("err" ,err.Error()) ,zap.String("UserName" , c.UserName) )
 		}
 
 		select {
 		case <-tk.C:
-			if c.Retries >= 3  {
-				log.Logger.Error("cmpp: keepalive error, reconnect", zap.String("UserName", c.UserName))
-				c.Connect()
+			//发送心跳检测包
+			err := c.SendCmppActiveTestReq(&cmpp.CmppActiveTestReqPkt{})
+			if err != nil {
+				log.Logger.Error("[CmppClient][KeepAlive] Check Alive Error", zap.Error(err), zap.String("UserName", c.UserName))
+				retries += 1
+			}
+
+			if retries > 3 {
+				log.Logger.Error("[CmppClient][KeepAlive] KeepAlive Error", zap.String("UserName", c.UserName))
+				c.Connected = false
+				go c.Connect()
 				return
 			}
 		}
@@ -145,7 +147,7 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 	sm.Addr = addr
 	sm.Version = v
 	sm.Cache = (&cache.Cache{}).New(1e4)
-	// go sm.Cache.StartRetry()
+	//go sm.Cache.StartRetry()
 
 	cfg := config.ConfigObj.ServerConfig
 	// 读取账户？？有了缓存是不是其实没用了
@@ -162,7 +164,6 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 	sm.maxNoRespPkgs = int32(cfg.MaxNoRspPkgs)
 	sm.ConnMap = make(map[string]*cmpp.Conn)
 	sm.UserMap = make(map[string]*Conn)
-
 
 	return nil
 }
@@ -210,7 +211,7 @@ func (sm *CmppServerManager) LoginAuthAvailable(account *config.CmppServerAuth, 
 func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).String()
 	pkg := req.Packer.(*cmpp.CmppConnReqPkt)
-	account  := cron_cache.GetAccountInfo(pkg.SrcAddr)
+	account := cron_cache.GetAccountInfo(pkg.SrcAddr)
 	if account == nil {
 		log.Logger.Error("[CmppServer][Connect] Error: invalid username",
 			zap.String("UserName", pkg.SrcAddr))
@@ -242,7 +243,7 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 		}
 	}
 	sm.ConnMap[addr] = req.Conn
-	sm.UserMap[addr] = &Conn{UserName: account.UserName , password: account.Password ,spCode: account.SpCode , spId: account.SpId}
+	sm.UserMap[addr] = &Conn{UserName: account.UserName, password: account.Password, spCode: account.SpCode, spId: account.SpId}
 
 	log.Logger.Info("[CmppServer][Login] Success",
 		zap.String("UserName", pkg.SrcAddr),
@@ -255,26 +256,22 @@ func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet,
 	switch pkg.Packer.(type) {
 	case *cmpp.CmppConnReqPkt: // 处理cmpp连接请求
 		return sm.Connect(pkg, res)
-	//case *cmpp.CmppActiveTestReqPkt: // 处理来自客户端的心跳检测请求
-	//	return sm.CmppActiveTestReq(pkg ,res)
-	//case *cmpp.CmppActiveTestRspPkt: // 客户端回复的心跳检测包
-	//	return sm.CmppActiveTestRsp(pkg ,res )
 	case *cmpp.Cmpp2SubmitReqPkt:
 		return sm.Cmpp2Submit(pkg, res)
 	case *cmpp.Cmpp3SubmitReqPkt:
 		return sm.Cmpp3Submit(pkg, res)
 	case *cmpp.CmppTerminateReqPkt: // 关闭连接
-		// return  sm.CmppTerminate(pkg ,res)
-		return false , nil
+		return false, nil
 	default:
 
 	}
 	return false, nil
 }
 
-func  (sm *CmppServerManager) Stop()  {
-	for  _, conn :=range sm.ConnMap {
+func (sm *CmppServerManager) Stop() {
+	for _, conn := range sm.ConnMap {
 		conn.Close()
 	}
 }
+
 // =====================CmppServer=====================
