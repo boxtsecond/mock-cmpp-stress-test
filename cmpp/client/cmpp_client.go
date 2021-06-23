@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
+	"mock-cmpp-stress-test/statistics"
 	"net"
 	"strings"
 	"time"
@@ -83,22 +84,24 @@ func (s *CmppClient) Receive() {
 		go func(cm *pkg.CmppClientManager) {
 			errCount := 0
 			for {
+				if errCount > 3 {
+					// TODO 直接把receiver干掉了好像也不太好，应该重连吧
+					s.Logger.Error("[CmppClient][ReceivePkgs] Error And Return",
+						zap.String("UserName", cm.UserName),
+						zap.String("Address", cm.Addr),
+						zap.Int("errCount" ,errCount))
+					return
+				}
 				receivePkg, err := cm.Client.RecvAndUnpackPkt(cm.Timeout)
 				if err != nil {
 					errCount += 1
 					if e, ok := err.(net.Error); ok && e.Timeout() {
+						statistics.CollectService.Service.AddPackerStatistics("DeliverResp", true)
 						s.Logger.Error("[CmppClient][ReceivePkgs] Error",
 							zap.String("UserName", cm.UserName),
 							zap.String("Address", cm.Addr),
 							zap.Error(err))
 						continue
-					}
-					if errCount > 3 {
-						s.Logger.Error("[CmppClient][ReceivePkgs] Error And Return",
-							zap.String("UserName", cm.UserName),
-							zap.String("Address", cm.Addr),
-							zap.Error(err))
-						return
 					}
 				}
 				receiveErr := cm.ReceivePkg(receivePkg)

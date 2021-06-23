@@ -5,7 +5,6 @@ import (
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/statistics"
 	"strings"
-
 	//"golang.org/x/text/width"
 	"mock-cmpp-stress-test/utils/log"
 	"strconv"
@@ -55,13 +54,15 @@ func (sm *CmppServerManager) Cmpp2Deliver(pkg *cmpp.Cmpp2DeliverReqPkt) error {
 	defer sm.Cache.Delete(key)
 	if addr != "" {
 		if conn, ok := sm.ConnMap[addr]; ok {
-			if err := conn.SendPkt(pkg, <-conn.SeqId); err != nil {
-				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Failed", zap.Error(err), zap.Uint64("MsgId", pkg.MsgId))
+			seqId := <-conn.SeqId
+			if err := conn.SendPkt(pkg, seqId); err != nil {
+				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Failed", zap.Error(err), zap.Uint64("MsgId", pkg.MsgId),  zap.Uint32("SeqId", seqId) )
 				statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
 				return err
 			} else {
-				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Success", zap.Uint64("MsgId", pkg.MsgId))
+				log.Logger.Info("[CmppServer][Cmpp2DeliverReq] Success", zap.Uint64("MsgId", pkg.MsgId) , zap.Uint32("SeqId", seqId))
 				statistics.CollectService.Service.AddPackerStatistics("Deliver", true)
+				return nil
 			}
 		}
 	} else {
@@ -83,7 +84,7 @@ func (sm *CmppServerManager) Cmpp3Deliver(pkg *cmpp.Cmpp3DeliverReqPkt) error {
 				statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
 				return err
 			} else {
-				log.Logger.Error("[CmppServer][Cmpp3DeliverReq] Success", zap.Uint64("MsgId", pkg.MsgId))
+				log.Logger.Info("[CmppServer][Cmpp3DeliverReq] Success", zap.Uint64("MsgId", pkg.MsgId))
 				statistics.CollectService.Service.AddPackerStatistics("Deliver", true)
 			}
 		}
