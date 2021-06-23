@@ -145,6 +145,7 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 	for total < worker.TotalNum {
 		select {
 		case <-ticker.C:
+			st.Logger.Info("Stress Test Ticker Total", zap.Uint64("Total", total))
 			for i := uint64(0); i < workerNum; i++ {
 				if total >= worker.TotalNum {
 					return
@@ -153,11 +154,11 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 				go func(id uint64) {
 					for sendNum := uint64(0); sendNum < concurrency; sendNum++ {
 						if total >= worker.TotalNum {
-							st.Logger.Info("")
 							return
 						}
 
 						for _, msg := range *st.cfg.Messages {
+							st.Logger.Info("Stress Test Worker Start", zap.Uint64("WorkerNum", id))
 							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
 								err, _ := cmppClient.Cmpp2Submit(&msg)
 								if err != nil {
@@ -177,11 +178,11 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 						}
 
 						atomic.AddUint64(&total, 1)
-						if worker.Sleep > 0 {
-							time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
-						}
 					}
 				}(i)
+				if worker.Sleep > 0 {
+					time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
+				}
 			}
 		case <-st.ctx.Done(): // if cancel() execute
 			return

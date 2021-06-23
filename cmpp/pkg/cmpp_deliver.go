@@ -64,6 +64,8 @@ func (sm *CmppServerManager) Cmpp2Deliver(pkg *cmpp.Cmpp2DeliverReqPkt) error {
 				statistics.CollectService.Service.AddPackerStatistics("Deliver", true)
 			}
 		}
+	} else {
+		statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
 	}
 	return nil
 }
@@ -86,6 +88,8 @@ func (sm *CmppServerManager) Cmpp3Deliver(pkg *cmpp.Cmpp3DeliverReqPkt) error {
 			}
 		}
 
+	} else {
+		statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
 	}
 	return nil
 }

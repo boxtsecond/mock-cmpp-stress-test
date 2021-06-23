@@ -8,7 +8,6 @@
 - [功能说明](#功能说明)
 
 ## 项目说明
-mock-cmpp-stress-test 是集 cmpp客户端、cmpp服务端 的轻量级模拟压测工具，可单独模拟 cmpp客户端 或 cmpp服务端。提供压测数据图表，或可使用Redis统计维度更丰富的数据。配置灵活，支持二次开发。
 
 mock-cmpp-stress-test 是针对CMPP协议下短信发送服务的轻量级压测工具。支持CMPP客户端、服务端独立部署，分别模拟高并发场景下的大量用户请求和渠道返回。压测结果使用HTML格式输出数据图表，亦可扩展redis用于更细粒度压测结果数据存储。详细配置如下，支持二次开发。
 
@@ -29,6 +28,7 @@ active_test_interval = 1
 max_no_resp_pkg_num = 3
 # 是否启用 cmpp 客户端
 enable = true
+
 # cmpp 连接账户信息
 [[cmpp_client.accounts]]
 # cmpp 客户端需要连接的服务端IP地址
@@ -43,15 +43,6 @@ password = ""
 sp_id = ""
 # cmpp spCode
 sp_code = ""
-
-# cmpp 客户端发送短信内容配置
-[[cmpp_client.messages]]
-# 扩展码
-extend = ""
-# 短信内容
-content = "【Test】领取属于您的优惠。回T退订"
-# 发送手机号
-phone = "12345678901"
 ##################### cmpp 客户端配置模块 #####################
 
 ##################### cmpp 服务端配置模块 #####################
@@ -68,6 +59,7 @@ version = "V21"
 heartbeat = 1
 # cmpp 服务端无响应时发送最大包个数
 max_no_resp_pkgs = 3
+
 # cmpp 服务端验证账号信息（可对照cmpp_client.accounts）
 [[cmpp_server.auths]]
 username = "200001"
@@ -78,13 +70,31 @@ sp_code = "1000"
 
 ##################### 压力测试配置模块 #####################
 [stress_test]
+# 是否开启压测服务
+enable = true
+
+# 压测线程配置
+[[stress_test.workers]]
+# 压测名称，对应 [[cmpp_client.accounts]] 中的 {ip}:{port}_{username}
+name = "127.0.0.1:7890_200002"
 # 每秒并发量，必填
 concurrency = 1000
 # 持续时间和总发送量不可同时为0。同时不为0时，优先使用总发送量压测。
 # 持续时间
 duration_time = 120
 # 总发送量
-total_num = 10000
+total_num = 1000000
+# 压测间隔时间
+sleep = 100
+
+# cmpp 客户端发送短信内容配置
+[[stress_test.messages]]
+# 扩展码
+extend = ""
+# 短信内容
+content = "【Test】领取属于您的优惠。回T退订"
+# 发送手机号
+phone = "12345678901"
 ##################### 压力测试配置模块 #####################
 
 ##################### 日志配置模块 #####################
@@ -109,27 +119,33 @@ port = 3306
 password = ""
 # redis 超时时间，单位秒
 timeout = 300
-wait = true
-# 是否启用 redis 存储统计数据，若不启用，则使用内容存储，统计数据维度将少于启用 redis 存储统计数据。
+# 是否启用 redis 存储统计数据，若不启用，则使用内存存储统计数据，统计数据维度将少于启用 redis 存储统计数据。
 enable = true
 ##################### redis配置模块 ##################### 
 ```
 ### 功能说明：
+- [x] CMPP客户端
+    - [x] 建立CMPP连接
+    - [x] 发送提交短信、心跳数据包
+    - [x] 接收回执数据包
+    - [x] 支持 cmpp2.0 及 cmpp3.0
 - [x] CMPP服务端
     - [x] 接收CMPP连接，校验用户名密码
     - [x] 接收来自客户端各类型数据包并处理
     - [x] 推送回执给指定客户端
+    - [x] 支持 cmpp2.0 及 cmpp3.0
     - [ ] 模拟上行，并推送给指定客户端
+- [x] 压测服务
+    - [x] 设置每秒并发量，当并发量过大时，可能不能达到
+    - [x] 可配置压测持续时间或压测总量
+    - [x] 存储统计数据，内存最多可存 30min，redis 不限
+- [x] 统计数据服务
+    - [x] 统计机器性能，CPU、内存、磁盘使用率
+    - [x] 统计提交短信、接收回执数据
 
-cmpp连接库：https://github.com/bigwhite/gocmpp
-图表库：https://github.com/go-echarts/go-echarts/blob/master/README_CN.md 
-
-
-
-TODO List
-- Cache 溢出 && Retry
-- Stress Test Result 图表
-
+### 使用工具说明：
+- cmpp连接库：https://github.com/bigwhite/gocmpp
+- 图表库：https://github.com/go-echarts/go-echarts/blob/master/README_CN.md 
 
 
 

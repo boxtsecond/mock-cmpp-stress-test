@@ -87,6 +87,10 @@ func (s *CmppClient) Receive() {
 				if err != nil {
 					errCount += 1
 					if e, ok := err.(net.Error); ok && e.Timeout() {
+						s.Logger.Error("[CmppClient][ReceivePkgs] Error",
+							zap.String("UserName", cm.UserName),
+							zap.String("Address", cm.Addr),
+							zap.Error(err))
 						continue
 					}
 					if errCount > 3 {
@@ -96,11 +100,6 @@ func (s *CmppClient) Receive() {
 							zap.Error(err))
 						return
 					}
-
-					s.Logger.Error("[CmppClient][ReceivePkgs] Error",
-						zap.String("UserName", cm.UserName),
-						zap.String("Address", cm.Addr),
-						zap.Error(err))
 				}
 				receiveErr := cm.ReceivePkg(receivePkg)
 				if receiveErr != nil {

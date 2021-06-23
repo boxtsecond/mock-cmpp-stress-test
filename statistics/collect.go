@@ -121,6 +121,14 @@ func (s *Collection) SavePackerStatistics(tickerCount int) {
 }
 
 func (s *Collection) GraphMachine() {
+	xStart := s.Service.GetXAxisStart(s.TickerCount)
+	xAxis := GetXAxis(xStart, s.TickerCount)
+	err, cpuData, memData, diskData := s.Service.GetMachineStatistics(s.TickerCount)
+	if err != nil {
+		s.Logger.Error("[Collect][GraphMachine] Error", zap.Error(err))
+		return
+	}
+
 	line := charts.NewLine()
 	line.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{
@@ -134,8 +142,8 @@ func (s *Collection) GraphMachine() {
 		charts.WithYAxisOpts(opts.YAxis{
 			Show:  true,
 			Scale: true,
-			Min:   0,
-			Max:   100,
+			//Min:   0,
+			//Max:   300,
 		}),
 		charts.WithLegendOpts(opts.Legend{
 			Show:         true,
@@ -148,14 +156,6 @@ func (s *Collection) GraphMachine() {
 			TriggerOn: "mousemove",
 		}),
 	)
-
-	xStart := s.Service.GetXAxisStart(s.TickerCount)
-	xAxis := GetXAxis(xStart, s.TickerCount)
-	err, cpuData, memData, diskData := s.Service.GetMachineStatistics(s.TickerCount)
-	if err != nil {
-		s.Logger.Error("[Collect][GraphMachine] Error", zap.Error(err))
-		return
-	}
 
 	var markPoints = []charts.SeriesOpts{
 		charts.WithMarkPointNameTypeItemOpts(opts.MarkPointNameTypeItem{
@@ -205,7 +205,7 @@ func (s *Collection) GraphPackage() {
 		charts.WithYAxisOpts(opts.YAxis{
 			Show:  true,
 			Scale: true,
-			Max:   float64((*data)[0][len((*data)[0])-1]) * 1.1,
+			Max:   int(float64((*data)[0][len((*data)[0])-1]) * 1.1), // 为了美观
 		}),
 		charts.WithLegendOpts(opts.Legend{
 			Show:         true,
