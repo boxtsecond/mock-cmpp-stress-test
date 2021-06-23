@@ -38,9 +38,9 @@ type CmppServerManager struct {
 	Version       cmpp.Type // cmpp version
 	heartbeat     time.Duration
 	maxNoRespPkgs int32
-	ConnMap map[string]*cmpp.Conn  // 连接池
-	UserMap map[string]*Conn  // 用户map
-	Cache *cache.Cache // 记录发送的key和client的对应的关系
+	ConnMap       map[string]*cmpp.Conn // 连接池
+	UserMap       map[string]*Conn      // 用户map
+	Cache         *cache.Cache          // 记录发送的key和client的对应的关系
 }
 
 type Conn struct {
@@ -85,7 +85,6 @@ func (cm *CmppClientManager) SplitLongSms(content string) [][]byte {
 	return chunks
 }
 
-
 func GetMsgId(spId string, seqId uint32) (uint64, error) {
 	now := time.Now()
 	month, _ := strconv.ParseInt(fmt.Sprintf("%d", now.Month()), 10, 32)
@@ -94,7 +93,7 @@ func GetMsgId(spId string, seqId uint32) (uint64, error) {
 	min := now.Minute()
 	sec := now.Second()
 	spIdInt, _ := strconv.ParseInt(spId, 10, 32)
-	binaryStr := fmt.Sprintf("%04b%05b%05b%06b%06b%022b%016b", month, day, hour, min, sec, spIdInt, seqId)
+	binaryStr := fmt.Sprintf("%04b%05b%05b%06b%06b%022b%016b", month, day, hour, min, sec, spIdInt, seqId%(2^16))
 	msgId, err := strconv.ParseUint(binaryStr, 2, 64)
 	if err != nil {
 		return 0, err

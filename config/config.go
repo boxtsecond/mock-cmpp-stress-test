@@ -30,6 +30,7 @@ type RedisConfig struct {
 	IP       string `toml:"ip"`
 	Port     uint16 `toml:"port"`
 	Password string `toml:"password"`
+	DB       uint16 `toml:"db"`
 	TimeOut  uint   `toml:"timeout"`
 	Enable   bool   `toml:"enable"`
 	Wait     bool   `toml:"wait"`

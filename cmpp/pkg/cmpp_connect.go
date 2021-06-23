@@ -96,7 +96,7 @@ func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
 }
 
 // 客户端发送心跳检测请求
-func (c *CmppClientManager) KeepAlive() {
+func (cm *CmppClientManager) KeepAlive() {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Logger.Error("[CmppClient][KeepAlive] panic recover", zap.Any("err", err))
@@ -108,23 +108,23 @@ func (c *CmppClientManager) KeepAlive() {
 	defer tk.Stop()
 
 	for {
-		if !c.Connected {
+		if !cm.Connected {
 			continue
 		}
 
 		select {
 		case <-tk.C:
 			//发送心跳检测包
-			err := c.SendCmppActiveTestReq(&cmpp.CmppActiveTestReqPkt{})
+			err := cm.SendCmppActiveTestReq(&cmpp.CmppActiveTestReqPkt{})
 			if err != nil {
-				log.Logger.Error("[CmppClient][KeepAlive] Check Alive Error", zap.Error(err), zap.String("UserName", c.UserName))
+				log.Logger.Error("[CmppClient][KeepAlive] Check Alive Error", zap.Error(err), zap.String("UserName", cm.UserName))
 				retries += 1
 			}
 
 			if retries > 3 {
-				log.Logger.Error("[CmppClient][KeepAlive] KeepAlive Error", zap.String("UserName", c.UserName))
-				c.Connected = false
-				go c.Connect()
+				log.Logger.Error("[CmppClient][KeepAlive] KeepAlive Error", zap.String("UserName", cm.UserName))
+				cm.Connected = false
+				cm.Connect()
 				return
 			}
 		}

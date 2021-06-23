@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/client"
 	"mock-cmpp-stress-test/config"
+	"mock-cmpp-stress-test/statistics"
 	"sync/atomic"
 	"time"
 )
@@ -68,6 +69,7 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 	cmppClient, ok := client.Clients[worker.Name]
 	if !ok {
 		st.Logger.Error("[StressTest][StartWorkerByDurationTime] Error", zap.Error(errors.New("can't find cmpp client")))
+		return
 	}
 
 	concurrency := worker.Concurrency
@@ -93,15 +95,17 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
 								err, _ := cmppClient.Cmpp2Submit(&msg)
 								if err != nil {
-									// TODO: 发送失败打点
+									statistics.CollectService.Service.AddPackerStatistics("Submit", false)
+								} else {
+									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
 								}
-								// TODO: 发送成功打点
 							} else if cmppClient.Version == cmpp.V30 {
 								err, _ := cmppClient.Cmpp3Submit(&msg)
 								if err != nil {
-									// TODO: 发送失败打点
+									statistics.CollectService.Service.AddPackerStatistics("Submit", false)
+								} else {
+									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
 								}
-								// TODO: 发送成功打点
 							}
 
 						}
@@ -122,6 +126,7 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 	cmppClient, ok := client.Clients[worker.Name]
 	if !ok {
 		st.Logger.Error("[StressTest][StartWorkerByTotalNum] Error", zap.Error(errors.New("can't find cmpp client")))
+		return
 	}
 
 	concurrency := worker.Concurrency
@@ -156,15 +161,17 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
 								err, _ := cmppClient.Cmpp2Submit(&msg)
 								if err != nil {
-									// TODO: 发送失败打点
+									statistics.CollectService.Service.AddPackerStatistics("Submit", false)
+								} else {
+									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
 								}
-								// TODO: 发送成功打点
 							} else if cmppClient.Version == cmpp.V30 {
 								err, _ := cmppClient.Cmpp3Submit(&msg)
 								if err != nil {
-									// TODO: 发送失败打点
+									statistics.CollectService.Service.AddPackerStatistics("Submit", false)
+								} else {
+									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
 								}
-								// TODO: 发送成功打点
 							}
 
 						}

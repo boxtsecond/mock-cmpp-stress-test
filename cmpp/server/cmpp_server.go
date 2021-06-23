@@ -68,7 +68,7 @@ func (s *CmppServer) StartDeliver() {
 		select {
 		case cmpp2Deliver := <-pkg.Cmpp2DeliverChan:
 			cmpp2DeliverPkgs = append(cmpp2DeliverPkgs, cmpp2Deliver)
-			if len(cmpp2DeliverPkgs) >= 100 { // 批次设置为100,推送给指定客户端
+			if len(cmpp2DeliverPkgs) >= 500 { // 批次设置为100,推送给指定客户端
 				csm.BatchCmpp2Deliver(cmpp2DeliverPkgs)
 				cmpp2DeliverPkgs = cmpp2DeliverPkgs[:0]
 			}
@@ -87,8 +87,8 @@ func (s *CmppServer) StartDeliver() {
 			}
 
 			if len(cmpp3DeliverPkgs) > 0 {
-				//csm.BatchCmpp2Deliver(cmpp3DeliverPkgs)
-				//cmpp2DeliverPkgs = cmpp3DeliverPkgs[:0]
+				csm.BatchCmpp3Deliver(cmpp3DeliverPkgs)
+				cmpp3DeliverPkgs = cmpp3DeliverPkgs[:0]
 			}
 		}
 	}

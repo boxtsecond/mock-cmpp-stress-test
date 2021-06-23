@@ -6,6 +6,7 @@ import (
 	cmpputils "github.com/bigwhite/gocmpp/utils"
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/config"
+	"mock-cmpp-stress-test/statistics"
 	"mock-cmpp-stress-test/utils/log"
 	"net"
 	"strconv"
@@ -92,13 +93,13 @@ func (cm *CmppClientManager) Cmpp2SubmitResp(resp *cmpp.Cmpp2SubmitRspPkt) error
 		return errors.New("get cache error")
 	}
 
-	// TODO: Add statistics, cache or redis
 	if resp.Result == 0 {
 		log.Logger.Info("[CmppClient][Cmpp2SubmitResp] Success",
 			zap.String("Addr", cm.Addr),
 			zap.String("UserName", cm.UserName),
 			zap.Uint32("SeqId", resp.SeqId),
 			zap.Uint64("MsgId", resp.MsgId))
+		statistics.CollectService.Service.AddPackerStatistics("SubmitResp", true)
 	} else {
 		log.Logger.Info("[CmppClient][Cmpp2SubmitResp] Error",
 			zap.String("Addr", cm.Addr),
@@ -106,6 +107,7 @@ func (cm *CmppClientManager) Cmpp2SubmitResp(resp *cmpp.Cmpp2SubmitRspPkt) error
 			zap.Uint32("SeqId", resp.SeqId),
 			zap.Uint64("MsgId", resp.MsgId),
 			zap.Uint8("ErrorCode", resp.Result))
+		statistics.CollectService.Service.AddPackerStatistics("SubmitResp", false)
 	}
 	return nil
 }
@@ -201,11 +203,12 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 		return errors.New("get cron_cache error")
 	}
 
-	// TODO: Add statistics, cron_cache or redis
 	if resp.Result == 0 {
 		log.Logger.Info("[CmppClient][Cmpp3SubmitResp] Success", zap.Uint32("SeqId", resp.SeqId), zap.Uint64("MsgId", resp.MsgId))
+		statistics.CollectService.Service.AddPackerStatistics("SubmitResp", true)
 	} else {
 		log.Logger.Info("[CmppClient][Cmpp3SubmitResp] Error", zap.Uint32("SeqId", resp.SeqId), zap.Uint64("MsgId", resp.MsgId), zap.Uint32("ErrorCode", resp.Result))
+		statistics.CollectService.Service.AddPackerStatistics("SubmitResp", false)
 	}
 	return nil
 }
@@ -215,9 +218,8 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 
 // =====================CmppServer=====================
 
-var Cmpp2DeliverChan = make(chan *cmpp.Cmpp2DeliverReqPkt , 100 )
-var Cmpp3DeliverChan  = make(chan *cmpp.Cmpp3DeliverReqPkt,100 )
-
+var Cmpp2DeliverChan = make(chan *cmpp.Cmpp2DeliverReqPkt, 100)
+var Cmpp3DeliverChan = make(chan *cmpp.Cmpp3DeliverReqPkt, 100)
 
 func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).String()
@@ -233,13 +235,16 @@ func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (
 	}
 	msgId, err := GetMsgId(account.spId, pkg.SeqId)
 	if err != nil {
-		log.Logger.Error("[CmppServer][Cmpp2Submit] GetMsgId Error", zap.Error(err))
+		log.Logger.Error("[CmppServer][Cmpp2Submit] GetMsgId Error",
+			zap.String("SpId", account.spId),
+			zap.Uint32("SeqId", pkg.SeqId),
+			zap.Error(err))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
 	}
-	// 写cache,记录一下发送的链接, 会不会造成内存泄漏？
-	setCacheErr := sm.Cache.Set(strconv.Itoa(int(msgId)) , strings.Join([]string{addr, account.UserName, account.spId, account.spCode}, ","))
+	setCacheErr := sm.Cache.Set(strconv.Itoa(int(msgId)), strings.Join([]string{addr, account.UserName, account.spId, account.spCode}, ","))
 	if setCacheErr != nil {
 		log.Logger.Error("[CmppClient][Cmpp2Submit][SetCache] Error:", zap.Error(setCacheErr))
+		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
 	}
 	// 构造一个回执
 	for _, phone := range pkg.DestTerminalId {
@@ -257,6 +262,7 @@ func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (
 		}
 		log.Logger.Info("[CmppServer][Cmpp2Submit] Success",
 			zap.String("Phone", phone),
+			zap.Uint32("SeqId", pkg.SeqId),
 			zap.Uint64("MsgId", msgId),
 			zap.String("RemoteAddr", addr))
 		// 返回状态报告
@@ -278,7 +284,7 @@ func (sm *CmppServerManager) Cmpp3Submit(req *cmpp.Packet, res *cmpp.Response) (
 
 	account, ok := sm.UserMap[addr]
 	if !ok {
-		log.Logger.Error("[CmppServer][Cmpp2Submit] Error",
+		log.Logger.Error("[CmppServer][Cmpp3Submit] Error",
 			zap.String("Phone", pkg.DestTerminalId[0]),
 			zap.String("RemoteAddr", addr))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
@@ -286,7 +292,10 @@ func (sm *CmppServerManager) Cmpp3Submit(req *cmpp.Packet, res *cmpp.Response) (
 
 	msgId, err := GetMsgId(account.spId, pkg.SeqId)
 	if err != nil {
-		log.Logger.Error("[CmppServer][Cmpp2Submit] GetMsgId Error", zap.Error(err))
+		log.Logger.Error("[CmppServer][Cmpp3Submit] GetMsgId Error",
+			zap.String("SpId", account.spId),
+			zap.Uint32("SeqId", pkg.SeqId),
+			zap.Error(err))
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
 	}
 
