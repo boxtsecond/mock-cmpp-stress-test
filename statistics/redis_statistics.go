@@ -117,6 +117,10 @@ func (s *RedisStatistics) GetXAxisStart(tickerCount int) int {
 	return 0
 }
 
+func (s *RedisStatistics) GetXAxisLength(tickerCount int) int {
+	return tickerCount
+}
+
 func (s *RedisStatistics) GetMachineStatistics(tickerCount int) (err error, cpu, mem, disk []float64) {
 	//offset := int64(0)
 	//for {

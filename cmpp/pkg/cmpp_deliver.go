@@ -14,7 +14,7 @@ import (
 // =====================CmppClient=====================
 
 func (cm *CmppClientManager) Cmpp2DeliverReq(pkg *cmpp.Cmpp2DeliverReqPkt) error {
-	log.Logger.Info("[CmppClient][Cmpp2DeliverReq] Success",
+	log.Logger.Info("[CmppClient][Cmpp2DeliverResp] Success",
 		zap.String("Addr", cm.Addr),
 		zap.String("UserName", cm.UserName),
 		zap.Any("Pkg", pkg))
@@ -23,7 +23,7 @@ func (cm *CmppClientManager) Cmpp2DeliverReq(pkg *cmpp.Cmpp2DeliverReqPkt) error
 }
 
 func (cm *CmppClientManager) Cmpp3DeliverReq(pkg *cmpp.Cmpp3DeliverReqPkt) error {
-	log.Logger.Info("[CmppClient][Cmpp3DeliverReq] Success",
+	log.Logger.Info("[CmppClient][Cmpp2DeliverResp] Success",
 		zap.String("Addr", cm.Addr),
 		zap.String("UserName", cm.UserName),
 		zap.Any("Pkg", pkg))
@@ -56,11 +56,11 @@ func (sm *CmppServerManager) Cmpp2Deliver(pkg *cmpp.Cmpp2DeliverReqPkt) error {
 		if conn, ok := sm.ConnMap[addr]; ok {
 			seqId := <-conn.SeqId
 			if err := conn.SendPkt(pkg, seqId); err != nil {
-				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Failed", zap.Error(err), zap.Uint64("MsgId", pkg.MsgId),  zap.Uint32("SeqId", seqId) )
+				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Failed", zap.Error(err), zap.Uint64("MsgId", pkg.MsgId), zap.Uint32("SeqId", seqId))
 				statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
 				return err
 			} else {
-				log.Logger.Info("[CmppServer][Cmpp2DeliverReq] Success", zap.Uint64("MsgId", pkg.MsgId) , zap.Uint32("SeqId", seqId))
+				log.Logger.Info("[CmppServer][Cmpp2DeliverReq] Success", zap.Uint64("MsgId", pkg.MsgId), zap.Uint32("SeqId", seqId))
 				statistics.CollectService.Service.AddPackerStatistics("Deliver", true)
 				return nil
 			}

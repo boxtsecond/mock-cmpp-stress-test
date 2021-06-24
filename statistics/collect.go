@@ -25,6 +25,7 @@ type CollectionService interface {
 	AddPackerStatistics(name string, success bool)
 
 	GetXAxisStart(tickerCount int) int
+	GetXAxisLength(tickerCount int) int
 	GetMachineStatistics(tickerCount int) (err error, cpu, mem, disk []float64)
 	GetPackerStatistics(tickerCount int) (error, *[][]uint64)
 }
@@ -68,25 +69,23 @@ func (s *Collection) Stop() error {
 	}
 	s.cancel()
 	s.Logger.Info("Collect Service Stop Success.")
+	s.Graph()
 	return nil
 }
 
 func (s *Collection) CollectionStatistics() {
 	t := time.NewTicker(1 * time.Second)
-	tickerCount := 0
+	s.TickerCount = 0
 
 	for {
 		select {
 		case <-t.C:
-			s.Logger.Info("[Collect][CollectionStatistics] Start", zap.Int("TickerCount", tickerCount))
-			s.SaveMachineStatistics(tickerCount)
-			s.SavePackerStatistics(tickerCount)
-			tickerCount += 1
+			//s.Logger.Info("[Collect][CollectionStatistics] Start", zap.Int("TickerCount", tickerCount))
+			s.SaveMachineStatistics(s.TickerCount)
+			s.SavePackerStatistics(s.TickerCount)
+			s.TickerCount += 1
 		case <-s.ctx.Done():
 			t.Stop()
-			s.TickerCount = tickerCount
-			go s.GraphMachine()
-			go s.GraphPackage()
 			return
 		}
 	}
@@ -120,15 +119,21 @@ func (s *Collection) SavePackerStatistics(tickerCount int) {
 	}
 }
 
+func (s *Collection) Graph() {
+	s.GraphMachine()
+	s.GraphPackage()
+}
+
 func (s *Collection) GraphMachine() {
-	xStart := s.Service.GetXAxisStart(s.TickerCount)
-	xAxis := GetXAxis(xStart, s.TickerCount)
 	err, cpuData, memData, diskData := s.Service.GetMachineStatistics(s.TickerCount)
 	if err != nil {
 		s.Logger.Error("[Collect][GraphMachine] Error", zap.Error(err))
 		return
 	}
 
+	xStart := s.Service.GetXAxisStart(s.TickerCount)
+	xLen := s.Service.GetXAxisLength(s.TickerCount)
+	xAxis := GetXAxis(xStart, s.TickerCount, xLen)
 	line := charts.NewLine()
 	line.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{
@@ -142,8 +147,8 @@ func (s *Collection) GraphMachine() {
 		charts.WithYAxisOpts(opts.YAxis{
 			Show:  true,
 			Scale: true,
-			//Min:   0,
-			//Max:   300,
+			Min:   0,
+			Max:   150,
 		}),
 		charts.WithLegendOpts(opts.Legend{
 			Show:         true,
@@ -151,8 +156,8 @@ func (s *Collection) GraphMachine() {
 			Bottom:       "0",
 		}),
 		charts.WithTooltipOpts(opts.Tooltip{
-			Show:      true,
-			Trigger:   "item",
+			Show: true,
+			//Trigger:   "item",
 			TriggerOn: "mousemove",
 		}),
 	)
@@ -221,7 +226,8 @@ func (s *Collection) GraphPackage() {
 	)
 
 	xStart := s.Service.GetXAxisStart(s.TickerCount)
-	xAxis := GetXAxis(xStart, s.TickerCount)
+	xLen := s.Service.GetXAxisLength(s.TickerCount)
+	xAxis := GetXAxis(xStart, s.TickerCount, xLen)
 
 	var markPoints = []charts.SeriesOpts{
 		charts.WithMarkPointNameTypeItemOpts(opts.MarkPointNameTypeItem{
@@ -257,11 +263,21 @@ func (s *Collection) GraphPackage() {
 
 }
 
-func GetXAxis(start, end int) []int {
+func GetXAxis(start, end, len int) []int {
 	xAxis := make([]int, 0)
+	multiple := end / len
+	for i := start; i < len; i++ {
+		if multiple != 0 {
+			xAxis = append(xAxis, i+len*(multiple-1))
+		} else {
+			xAxis = append(xAxis, i)
+		}
+	}
 
-	for i := start; i < end+1; i++ {
-		xAxis = append(xAxis, i)
+	if start != 0 {
+		for i := 0; i < start; i++ {
+			xAxis = append(xAxis, i+len*multiple)
+		}
 	}
 
 	return xAxis

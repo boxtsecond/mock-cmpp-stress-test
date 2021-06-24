@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
 	cmpp "github.com/bigwhite/gocmpp"
 	"math"
@@ -29,6 +30,9 @@ type CmppClientManager struct {
 	Client    *cmpp.Client // cmpp client
 	Connected bool
 	Cache     *cache.Cache
+
+	Ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // cmpp test

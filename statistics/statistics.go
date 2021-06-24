@@ -32,28 +32,30 @@ type Item struct {
 	Success            uint64
 }
 
+const DefaultMaxStatisticsCount = 30 * 60
+
 func (s *Statistics) Init(log *zap.Logger, ctx context.Context) {
 	//s.ctx = ctx
 	s.Logger = log
 	s.Machine = &MachineStatistics{
 		Item:       s.NewDefaultItem(),
-		Statistics: make([][]float64, 30*60),
+		Statistics: make([][]float64, DefaultMaxStatisticsCount),
 	}
 	s.Submit = &PackerStatistics{
 		Item:       s.NewDefaultItem(),
-		Statistics: make([][]uint64, 30*60),
+		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
 	}
 	s.SubmitResp = &PackerStatistics{
 		Item:       s.NewDefaultItem(),
-		Statistics: make([][]uint64, 30*60),
+		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
 	}
 	s.Deliver = &PackerStatistics{
 		Item:       s.NewDefaultItem(),
-		Statistics: make([][]uint64, 30*60),
+		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
 	}
 	s.DeliverResp = &PackerStatistics{
 		Item:       s.NewDefaultItem(),
-		Statistics: make([][]uint64, 30*60),
+		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
 	}
 }
 
@@ -67,7 +69,7 @@ func (s *Statistics) Stop() error {
 
 func (s *Statistics) NewDefaultItem() Item {
 	return Item{
-		MaxStatisticsCount: 30 * 60,
+		MaxStatisticsCount: DefaultMaxStatisticsCount,
 		Head:               0,
 		Total:              0,
 		Success:            0,
@@ -76,9 +78,9 @@ func (s *Statistics) NewDefaultItem() Item {
 
 func (s *Statistics) SaveMachineStatistics(tickerCount int, cpu, mem, disk float64) error {
 	index := tickerCount
-	if tickerCount > s.Machine.MaxStatisticsCount {
-		index = tickerCount % (s.Machine.MaxStatisticsCount + 1)
-		s.Machine.Head = uint(index) + 1
+	if tickerCount >= s.Machine.MaxStatisticsCount {
+		index = tickerCount % (s.Machine.MaxStatisticsCount)
+		s.Machine.Head = uint((index + 1) % s.Machine.MaxStatisticsCount)
 	}
 
 	s.Machine.Statistics[index] = []float64{cpu, mem, disk}
@@ -95,9 +97,9 @@ func (s *Statistics) SavePackerStatistics(tickerCount int) error {
 
 func (ps *PackerStatistics) SavePackerStatistics(tickerCount int) {
 	index := tickerCount
-	if tickerCount > ps.MaxStatisticsCount {
-		index = tickerCount % (ps.MaxStatisticsCount + 1)
-		ps.Head = uint(index) + 1
+	if tickerCount >= ps.MaxStatisticsCount {
+		index = tickerCount % (ps.MaxStatisticsCount)
+		ps.Head = uint((index + 1) % ps.MaxStatisticsCount)
 	}
 	ps.Statistics[index] = []uint64{ps.Total, ps.Success}
 }
@@ -123,10 +125,17 @@ func (ps *PackerStatistics) AddPackerStatistics(success bool) {
 }
 
 func (s *Statistics) GetXAxisStart(tickerCount int) int {
-	if tickerCount < s.Submit.MaxStatisticsCount {
+	if tickerCount <= s.Submit.MaxStatisticsCount {
 		return 0
 	}
 	return int(s.Submit.Head)
+}
+
+func (s *Statistics) GetXAxisLength(tickerCount int) int {
+	if tickerCount <= s.Machine.MaxStatisticsCount {
+		return tickerCount
+	}
+	return s.Machine.MaxStatisticsCount
 }
 
 func (s *Statistics) GetMachineStatistics(tickerCount int) (err error, cpu, mem, disk []float64) {

@@ -217,9 +217,8 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 // =====================CmppClient=====================
 
 // =====================CmppServer=====================
-
-var Cmpp2DeliverChan = make(chan *cmpp.Cmpp2DeliverReqPkt, 100)
-var Cmpp3DeliverChan = make(chan *cmpp.Cmpp3DeliverReqPkt, 100)
+var Cmpp2DeliverChan = make(chan *cmpp.Cmpp2DeliverReqPkt, 1000)
+var Cmpp3DeliverChan = make(chan *cmpp.Cmpp3DeliverReqPkt, 1000)
 
 func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).String()
@@ -266,7 +265,7 @@ func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (
 			zap.Uint64("MsgId", msgId),
 			zap.String("RemoteAddr", addr))
 		// 返回状态报告
-		sm.SendCmpp2DeliverPkg(deliverPkg)
+		go sm.SendCmpp2DeliverPkg(deliverPkg)
 	}
 	resp.MsgId = msgId
 	return false, nil
@@ -318,11 +317,15 @@ func (sm *CmppServerManager) Cmpp3Submit(req *cmpp.Packet, res *cmpp.Response) (
 			zap.String("RemoteAddr", addr))
 
 		// 返回状态报告
-		Cmpp3DeliverChan <- deliverPkg
+		go sm.SendCmpp3DeliverPkg(deliverPkg)
 	}
 
 	resp.MsgId = msgId
 	return false, nil
+}
+
+func (sm *CmppServerManager) SendCmpp3DeliverPkg(pkg *cmpp.Cmpp3DeliverReqPkt) {
+	Cmpp3DeliverChan <- pkg
 }
 
 // =====================CmppServer=====================

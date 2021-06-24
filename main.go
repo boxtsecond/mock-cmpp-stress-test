@@ -61,7 +61,6 @@ func Stop() error {
 				zap.Int("Index", i),
 				zap.Error(err))
 		}
-		time.Sleep(time.Second)
 	}
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"mock-cmpp-stress-test/cmpp/client"
 	"mock-cmpp-stress-test/config"
 	"mock-cmpp-stress-test/statistics"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -62,6 +63,7 @@ func (st *StressTest) Start() error {
 
 func (st *StressTest) Stop() error {
 	st.cancel()
+	st.Logger.Info("Stress Test Stop Success")
 	return nil
 }
 
@@ -109,11 +111,11 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 							}
 
 						}
-						if worker.Sleep > 0 {
-							time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
-						}
 					}
 				}(i)
+				if worker.Sleep > 0 {
+					time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
+				}
 			}
 			atomic.AddUint64(&count, 1)
 		case <-st.ctx.Done(): // if cancel() execute
@@ -142,6 +144,8 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	var mutex sync.Mutex
+
 	for total < worker.TotalNum {
 		select {
 		case <-ticker.C:
@@ -153,10 +157,12 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 
 				go func(id uint64) {
 					for sendNum := uint64(0); sendNum < concurrency; sendNum++ {
-						if total >= worker.TotalNum {
+						mutex.Lock()
+						atomic.AddUint64(&total, 1)
+						if total >= worker.TotalNum+1 {
 							return
 						}
-
+						mutex.Unlock()
 						for _, msg := range *st.cfg.Messages {
 							st.Logger.Info("Stress Test Worker Start", zap.Uint64("WorkerNum", id))
 							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
@@ -176,8 +182,6 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 							}
 
 						}
-
-						atomic.AddUint64(&total, 1)
 					}
 				}(i)
 				if worker.Sleep > 0 {

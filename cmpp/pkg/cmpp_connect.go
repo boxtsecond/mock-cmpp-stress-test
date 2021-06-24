@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"errors"
 	cmpp "github.com/bigwhite/gocmpp"
@@ -41,6 +42,7 @@ func (cm *CmppClientManager) Init(version, addr, username, password, spId, spCod
 	if cm.Timeout > defaultTimeout {
 		cm.Timeout = defaultTimeout
 	}
+	cm.Ctx, cm.cancel = context.WithCancel(context.Background())
 	return nil
 }
 
@@ -67,6 +69,7 @@ func (cm *CmppClientManager) Connect() error {
 func (cm *CmppClientManager) Disconnect() {
 	cm.Client.Disconnect()
 	cm.Connected = false
+	cm.cancel()
 	log.Logger.Info("[CmppClient][Disconnect] Success", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("Password", cm.Password))
 }
 
@@ -127,6 +130,9 @@ func (cm *CmppClientManager) KeepAlive() {
 				cm.Connect()
 				return
 			}
+
+		case <-cm.Ctx.Done():
+			return
 		}
 	}
 
@@ -147,7 +153,6 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 	sm.Addr = addr
 	sm.Version = v
 	sm.Cache = (&cache.Cache{}).New(1e4)
-	//go sm.Cache.StartRetry()
 
 	cfg := config.ConfigObj.ServerConfig
 	sm.heartbeat = time.Duration(cfg.HeartBeat) * time.Second // 每秒心跳检测
@@ -161,18 +166,21 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 func (sm *CmppServerManager) Start() error {
 	// 启动定时
 	cron_cache.Start()
-	// TODO 启动端口服务,这里会阻塞，后面的日志打不出来。
-	err := cmpp.ListenAndServe(sm.Addr, sm.Version,
-		sm.heartbeat,
-		sm.maxNoRespPkgs,
-		nil,
-		cmpp.HandlerFunc(sm.PacketHandler),
-	)
-	if err != nil {
-		log.Logger.Error("[CmppServer][Start] Error",
-			zap.Error(err))
-		return err
-	}
+
+	go func() {
+		err := cmpp.ListenAndServe(sm.Addr, sm.Version,
+			sm.heartbeat,
+			sm.maxNoRespPkgs,
+			nil,
+			cmpp.HandlerFunc(sm.PacketHandler),
+		)
+		if err != nil {
+			log.Logger.Error("[CmppServer][Start] Error",
+				zap.Error(err))
+			return
+		}
+	}()
+
 	log.Logger.Info("[CmppServer][Start] Success",
 		zap.String("Address", sm.Addr),
 		zap.String("Version", string(sm.Version)))
