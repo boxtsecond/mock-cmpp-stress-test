@@ -18,14 +18,15 @@ const (
 // cmpp client
 type CmppClientManager struct {
 	// setting
-	Addr     string        // cmpp test address
-	Version  cmpp.Type     // cmpp version
-	UserName string        // cmpp connect username
-	Password string        // cmpp connect password
-	SpId     string        // cmpp submit sp_id
-	SpCode   string        // cmpp submit sp_code
-	Retries  uint          // cmpp connect retry times
-	Timeout  time.Duration // cmpp connect timeout
+	Addr               string        // cmpp test address
+	Version            cmpp.Type     // cmpp version
+	UserName           string        // cmpp connect username
+	Password           string        // cmpp connect password
+	SpId               string        // cmpp submit sp_id
+	SpCode             string        // cmpp submit sp_code
+	Retries            uint          // cmpp connect retry times
+	Timeout            time.Duration // cmpp connect timeout
+	ActiveTestInterval time.Duration // cmpp connect timeout
 
 	Client    *cmpp.Client // cmpp client
 	Connected bool
@@ -97,7 +98,7 @@ func GetMsgId(spId string, seqId uint32) (uint64, error) {
 	min := now.Minute()
 	sec := now.Second()
 	spIdInt, _ := strconv.ParseInt(spId, 10, 32)
-	binaryStr := fmt.Sprintf("%04b%05b%05b%06b%06b%022b%016b", month, day, hour, min, sec, spIdInt, seqId%(2^16))
+	binaryStr := fmt.Sprintf("%04b%05b%05b%06b%06b%022b%016b", month, day, hour, min, sec, spIdInt, seqId)
 	msgId, err := strconv.ParseUint(binaryStr, 2, 64)
 	if err != nil {
 		return 0, err

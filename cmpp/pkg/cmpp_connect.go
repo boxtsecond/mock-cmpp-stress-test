@@ -18,27 +18,27 @@ import (
 )
 
 // =====================CmppClient=====================
-func (cm *CmppClientManager) Init(version, addr, username, password, spId, spCode string, retryTimes uint, timeout time.Duration) error {
-	v := GetVersion(version)
+func (cm *CmppClientManager) Init(cfg *config.CmppClientConfig, addr string, account config.CmppAccount) error {
+	v := GetVersion(cfg.Version)
 	if v == InvalidVersion {
 		return errors.New("invalid cmpp version")
 	}
 	cm.Client = cmpp.NewClient(v)
 	cm.Addr = addr
 	cm.Version = v
-	cm.UserName = username
-	cm.Password = password
-	cm.Retries = retryTimes
-	cm.Timeout = timeout
-	cm.SpId = spId
-	cm.SpCode = spCode
+	cm.UserName = account.Username
+	cm.Password = account.Password
+	cm.Retries = cfg.Retries
+	cm.Timeout = time.Duration(cfg.TimeOut) * time.Second
+	cm.ActiveTestInterval = time.Duration(cfg.ActiveTestInterval) * time.Millisecond
+	cm.SpId = account.SpID
+	cm.SpCode = account.SpCode
 	cm.Cache = (&cache.Cache{}).New(1e4)
 
 	if cm.Retries == 0 {
 		cm.Retries = defaultRetries
 	}
 
-	cm.Timeout = timeout
 	if cm.Timeout > defaultTimeout {
 		cm.Timeout = defaultTimeout
 	}
@@ -89,6 +89,7 @@ func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
 		return cm.Cmpp2DeliverReq(p)
 	case *cmpp.Cmpp3DeliverReqPkt:
 		return cm.Cmpp3DeliverReq(p)
+
 	default:
 		typeErr := errors.New("unhandled pkg type")
 		log.Logger.Error("[CmppClient][ReceivePkgs] Error",
@@ -100,34 +101,35 @@ func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
 
 // 客户端发送心跳检测请求
 func (cm *CmppClientManager) KeepAlive() {
+	retries := 0
+	tk := time.NewTicker(cm.ActiveTestInterval)
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Logger.Error("[CmppClient][KeepAlive] panic recover", zap.Any("err", err))
 		}
+		tk.Stop()
 	}()
-
-	retries := 0
-	tk := time.NewTicker(10 * time.Second) // 每10秒发一个心跳包
-	defer tk.Stop()
 
 	for {
 		if !cm.Connected {
-			continue
+			return
+		}
+
+		err := cm.SendCmppActiveTestReq(&cmpp.CmppActiveTestReqPkt{})
+		if err != nil {
+			log.Logger.Error("[CmppClient][KeepAlive] Check Alive Error", zap.Error(err), zap.String("UserName", cm.UserName))
+			retries += 1
+		} else {
+			retries = 0
 		}
 
 		select {
 		case <-tk.C:
-			//发送心跳检测包
-			err := cm.SendCmppActiveTestReq(&cmpp.CmppActiveTestReqPkt{})
-			if err != nil {
-				log.Logger.Error("[CmppClient][KeepAlive] Check Alive Error", zap.Error(err), zap.String("UserName", cm.UserName))
-				retries += 1
-			}
-
 			if retries > 3 {
 				log.Logger.Error("[CmppClient][KeepAlive] KeepAlive Error", zap.String("UserName", cm.UserName))
 				cm.Connected = false
-				cm.Connect()
+				go cm.Connect()
 				return
 			}
 
@@ -206,6 +208,7 @@ func (sm *CmppServerManager) LoginAuthAvailable(account *config.CmppServerAuth, 
 		nil))
 	return true, string(authIsmg[:])
 }
+
 func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).String()
 	pkg := req.Packer.(*cmpp.CmppConnReqPkt)
@@ -251,17 +254,22 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 }
 
 func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet, l *_log.Logger) (bool, error) {
-	switch pkg.Packer.(type) {
+	switch p := pkg.Packer.(type) {
 	case *cmpp.CmppConnReqPkt: // 处理cmpp连接请求
 		return sm.Connect(pkg, res)
+
 	case *cmpp.Cmpp2SubmitReqPkt:
 		return sm.Cmpp2Submit(pkg, res)
 	case *cmpp.Cmpp3SubmitReqPkt:
 		return sm.Cmpp3Submit(pkg, res)
+
+	case *cmpp.Cmpp2DeliverRspPkt:
+		return sm.Cmpp2DeliverResp(p, res)
+	case *cmpp.Cmpp3DeliverRspPkt:
+		return sm.Cmpp3DeliverResp(p, res)
+
 	case *cmpp.CmppTerminateReqPkt: // 关闭连接
 		return false, nil
-	default:
-
 	}
 	return false, nil
 }

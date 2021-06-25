@@ -68,10 +68,11 @@ func (cm *CmppClientManager) Cmpp2Submit(message *config.TextMessages) (error, [
 		log.Logger.Error("[CmppClient][GetCmppSubmit2ReqPkg] Error:", zap.Error(err))
 		return err, seqIds
 	}
+
 	for _, pkg := range pkgs {
 		seqId, sendErr := cm.Client.SendReqPkt(pkg)
 		if sendErr != nil {
-			log.Logger.Error("[CmppClient][Cmpp2Submit] Error:", zap.Error(sendErr))
+			log.Logger.Error("[CmppClient][Cmpp2Submit] Error", zap.Error(sendErr))
 			return sendErr, seqIds
 		}
 		seqIds = append(seqIds, seqId)
@@ -79,8 +80,9 @@ func (cm *CmppClientManager) Cmpp2Submit(message *config.TextMessages) (error, [
 		if setCacheErr != nil {
 			log.Logger.Error("[CmppClient][Cmpp2Submit][SetCache] Error:", zap.Error(setCacheErr))
 		}
+		log.Logger.Info("[CmppClient][Cmpp2Submit] Success", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("SpId", cm.SpId), zap.String("SpCode", cm.SpCode), zap.String("Phone", message.Phone), zap.Any("SeqIds", seqIds))
 	}
-	log.Logger.Info("[CmppClient][Cmpp2Submit] Success", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("SpId", cm.SpId), zap.String("SpCode", cm.SpCode), zap.String("Phone", message.Phone), zap.Any("SeqIds", seqIds))
+
 	return nil, seqIds
 }
 
@@ -217,8 +219,8 @@ func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error
 // =====================CmppClient=====================
 
 // =====================CmppServer=====================
-var Cmpp2DeliverChan = make(chan *cmpp.Cmpp2DeliverReqPkt, 1000)
-var Cmpp3DeliverChan = make(chan *cmpp.Cmpp3DeliverReqPkt, 1000)
+var Cmpp2DeliverChan = make(chan *cmpp.Cmpp2DeliverReqPkt, 500)
+var Cmpp3DeliverChan = make(chan *cmpp.Cmpp3DeliverReqPkt, 500)
 
 func (sm *CmppServerManager) Cmpp2Submit(req *cmpp.Packet, res *cmpp.Response) (bool, error) {
 	addr := req.Conn.Conn.RemoteAddr().(*net.TCPAddr).String()

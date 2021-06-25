@@ -14,21 +14,27 @@ import (
 // =====================CmppClient=====================
 
 func (cm *CmppClientManager) Cmpp2DeliverReq(pkg *cmpp.Cmpp2DeliverReqPkt) error {
-	log.Logger.Info("[CmppClient][Cmpp2DeliverResp] Success",
+	log.Logger.Info("[CmppClient][Cmpp2DeliverReq] Success",
 		zap.String("Addr", cm.Addr),
 		zap.String("UserName", cm.UserName),
 		zap.Any("Pkg", pkg))
-	statistics.CollectService.Service.AddPackerStatistics("DeliverResp", true)
-	return nil
+	statistics.CollectService.Service.AddPackerStatistics("Deliver", true)
+	return cm.Client.SendRspPkt(&cmpp.Cmpp2DeliverRspPkt{
+		MsgId:  pkg.MsgId,
+		Result: 0,
+	}, pkg.SeqId)
 }
 
 func (cm *CmppClientManager) Cmpp3DeliverReq(pkg *cmpp.Cmpp3DeliverReqPkt) error {
-	log.Logger.Info("[CmppClient][Cmpp2DeliverResp] Success",
+	log.Logger.Info("[CmppClient][Cmpp3DeliverReq] Success",
 		zap.String("Addr", cm.Addr),
 		zap.String("UserName", cm.UserName),
 		zap.Any("Pkg", pkg))
-	statistics.CollectService.Service.AddPackerStatistics("DeliverResp", true)
-	return nil
+	statistics.CollectService.Service.AddPackerStatistics("Deliver", true)
+	return cm.Client.SendRspPkt(&cmpp.Cmpp3DeliverRspPkt{
+		MsgId:  pkg.MsgId,
+		Result: 0,
+	}, pkg.SeqId)
 }
 
 // =====================CmppClient=====================
@@ -57,18 +63,22 @@ func (sm *CmppServerManager) Cmpp2Deliver(pkg *cmpp.Cmpp2DeliverReqPkt) error {
 			seqId := <-conn.SeqId
 			if err := conn.SendPkt(pkg, seqId); err != nil {
 				log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Failed", zap.Error(err), zap.Uint64("MsgId", pkg.MsgId), zap.Uint32("SeqId", seqId))
-				statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
 				return err
 			} else {
 				log.Logger.Info("[CmppServer][Cmpp2DeliverReq] Success", zap.Uint64("MsgId", pkg.MsgId), zap.Uint32("SeqId", seqId))
-				statistics.CollectService.Service.AddPackerStatistics("Deliver", true)
 				return nil
 			}
 		}
 	} else {
-		statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
+		log.Logger.Error("[CmppServer][Cmpp2DeliverReq] Error", zap.Uint64("MsgId", pkg.MsgId))
 	}
 	return nil
+}
+
+func (sm *CmppServerManager) Cmpp2DeliverResp(pkg *cmpp.Cmpp2DeliverRspPkt, res *cmpp.Response) (bool, error) {
+	log.Logger.Info("[CmppServer][Cmpp2DeliverResp] Success", zap.Uint64("MsgId", pkg.MsgId), zap.Uint32("SeqId", pkg.SeqId))
+	statistics.CollectService.Service.AddPackerStatistics("DeliverResp", true)
+	return false, nil
 }
 
 // 推送回执给指定连接
@@ -81,18 +91,21 @@ func (sm *CmppServerManager) Cmpp3Deliver(pkg *cmpp.Cmpp3DeliverReqPkt) error {
 		if conn, ok := sm.ConnMap[addr]; ok {
 			if err := conn.SendPkt(pkg, <-conn.SeqId); err != nil {
 				log.Logger.Error("[CmppServer][Cmpp3DeliverReq] Failed", zap.Error(err), zap.Uint64("MsgId", pkg.MsgId))
-				statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
 				return err
 			} else {
 				log.Logger.Info("[CmppServer][Cmpp3DeliverReq] Success", zap.Uint64("MsgId", pkg.MsgId))
-				statistics.CollectService.Service.AddPackerStatistics("Deliver", true)
 			}
 		}
-
 	} else {
-		statistics.CollectService.Service.AddPackerStatistics("Deliver", false)
+		log.Logger.Error("[CmppServer][Cmpp3DeliverReq] Error", zap.Uint64("MsgId", pkg.MsgId))
 	}
 	return nil
+}
+
+func (sm *CmppServerManager) Cmpp3DeliverResp(pkg *cmpp.Cmpp3DeliverRspPkt, res *cmpp.Response) (bool, error) {
+	log.Logger.Info("[CmppServer][Cmpp3DeliverResp] Success", zap.Uint64("MsgId", pkg.MsgId), zap.Uint32("SeqId", pkg.SeqId))
+	statistics.CollectService.Service.AddPackerStatistics("DeliverResp", true)
+	return false, nil
 }
 
 // =====================CmppServer=====================

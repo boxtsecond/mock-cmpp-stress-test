@@ -61,29 +61,35 @@ func (s *CmppServer) Stop() error {
 }
 
 func (s *CmppServer) StartDeliver() {
-	defer func() {
-		if err := recover(); err != nil {
-			s.Logger.Error("Deliver Worker Error:", zap.Any("err", err))
-		}
-	}()
 	cmpp2DeliverPkgs := make([]*cmpp.Cmpp2DeliverReqPkt, 0)
 	cmpp3DeliverPkgs := make([]*cmpp.Cmpp3DeliverReqPkt, 0)
 	tk := time.NewTicker(1 * time.Second)
-	defer tk.Stop()
+
+	defer func() {
+		tk.Stop()
+		if len(cmpp2DeliverPkgs) > 0 {
+			csm.BatchCmpp2Deliver(cmpp2DeliverPkgs)
+		}
+
+		if len(cmpp3DeliverPkgs) > 0 {
+			csm.BatchCmpp3Deliver(cmpp3DeliverPkgs)
+		}
+	}()
+
 	for {
 		select {
 		case cmpp2Deliver := <-pkg.Cmpp2DeliverChan:
 			cmpp2DeliverPkgs = append(cmpp2DeliverPkgs, cmpp2Deliver)
-			if len(cmpp2DeliverPkgs) >= 100 {
+			if len(cmpp2DeliverPkgs) >= 500 {
 				csm.BatchCmpp2Deliver(cmpp2DeliverPkgs)
 				cmpp2DeliverPkgs = cmpp2DeliverPkgs[:0]
 			}
 
 		case cmpp3Deliver := <-pkg.Cmpp3DeliverChan:
 			cmpp3DeliverPkgs = append(cmpp3DeliverPkgs, cmpp3Deliver)
-			if len(cmpp3DeliverPkgs) >= 100 {
-				csm.BatchCmpp2Deliver(cmpp2DeliverPkgs)
-				cmpp2DeliverPkgs = cmpp2DeliverPkgs[:0]
+			if len(cmpp3DeliverPkgs) >= 500 {
+				csm.BatchCmpp3Deliver(cmpp3DeliverPkgs)
+				cmpp3DeliverPkgs = cmpp3DeliverPkgs[:0]
 
 			}
 		case <-tk.C:

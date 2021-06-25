@@ -30,12 +30,24 @@ func (s *RedisStatistics) Start() error {
 	}
 
 	s.Client = s.NewRedisClient()
-	if _, err := s.Client.Ping(s.Client.Context()).Result(); err != nil {
+	if _, err := s.Client.Ping(s.ctx).Result(); err != nil {
 		s.Logger.Fatal("Redis Start Error", zap.Error(err))
 		return err
 	}
 
+	s.ClearKeys()
 	return nil
+}
+
+func (s *RedisStatistics) ClearKeys() {
+	keys := []string{
+		"Machine", "Packer",
+		"Submit_Total", "Submit_Success",
+		"SubmitResp_Total", "SubmitResp_Success",
+		"Deliver_Total", "Deliver_Success",
+		"DeliverResp_Total", "DeliverResp_Success",
+	}
+	s.Client.Del(s.ctx, keys...)
 }
 
 func (s *RedisStatistics) Stop() error {
@@ -54,8 +66,12 @@ func (s *RedisStatistics) NewRedisClient() *redis.Client {
 func (s *RedisStatistics) SaveMachineStatistics(tickerCount int, cpu, mem, disk float64) error {
 	key := "Machine"
 	status := s.Client.ZAdd(s.ctx, key, &redis.Z{
-		Score:  float64(tickerCount),
-		Member: []float64{cpu * 100, mem * 100, disk * 100},
+		Score: float64(tickerCount),
+		Member: strings.Join([]string{
+			fmt.Sprintf("%.3f", cpu),
+			fmt.Sprintf("%.3f", mem),
+			fmt.Sprintf("%.3f", disk),
+		}, ","),
 	})
 	return status.Err()
 }
@@ -64,9 +80,9 @@ func (s *RedisStatistics) SavePackerStatistics(tickerCount int) error {
 	pipeline := s.Client.Pipeline()
 	keys := []string{
 		"Submit_Total", "Submit_Success",
-		"Submit_Resp_Total", "Submit_Resp_Total",
+		"SubmitResp_Total", "SubmitResp_Success",
 		"Deliver_Total", "Deliver_Success",
-		"Deliver_Resp_Total", "Deliver_Resp_Success",
+		"DeliverResp_Total", "DeliverResp_Success",
 	}
 	for _, k := range keys {
 		pipeline.Get(s.ctx, k)
@@ -78,9 +94,11 @@ func (s *RedisStatistics) SavePackerStatistics(tickerCount int) error {
 
 	members := make([]string, 0)
 	for _, c := range cmd {
-		result, _ := c.(*redis.IntCmd).Result()
-		members = append(members, string(result))
+		result, _ := c.(*redis.StringCmd).Result()
+		members = append(members, result)
 	}
+
+	members = append(members, strconv.Itoa(tickerCount))
 
 	status := s.Client.ZAdd(s.ctx, "Packer", &redis.Z{
 		Score:  float64(tickerCount),
@@ -122,43 +140,49 @@ func (s *RedisStatistics) GetXAxisLength(tickerCount int) int {
 }
 
 func (s *RedisStatistics) GetMachineStatistics(tickerCount int) (err error, cpu, mem, disk []float64) {
-	//offset := int64(0)
-	//for {
-	//	vals, e := s.Client.ZRangeByScore(s.ctx, "Machine", &redis.ZRangeBy{
-	//		Offset: offset,
-	//		Count:  5000,
-	//	}).Result()
-	//
-	//	if e != nil {
-	//		err = e
-	//		return
-	//	}
-	//
-	//	for _, v := range vals {
-	//		vStrArr := strings.Split(v, ",")
-	//		if len(vStrArr) == 3 {
-	//			cpu = append(cpu, vStrArr[0])
-	//			mem = append(mem, vStrArr[1]+"%")
-	//			disk = append(disk, vStrArr[2]+"%")
-	//		}
-	//	}
-	//
-	//	if len(vals) < 5000 {
-	//		return
-	//	} else {
-	//		offset += 5000
-	//	}
-	//}
-	return
+	offset := 0
+	interval := 5
+	for {
+		vals, e := s.Client.ZRangeByScore(s.ctx, "Machine", &redis.ZRangeBy{
+			Min: strconv.Itoa(offset),
+			Max: strconv.Itoa(offset + interval),
+		}).Result()
+
+		if e != nil {
+			err = e
+			return
+		}
+		for _, v := range vals {
+			vStrArr := strings.Split(v, ",")
+			if len(vStrArr) == 3 {
+				if c, _ := strconv.ParseFloat(vStrArr[0], 64); err == nil {
+					cpu = append(cpu, c)
+				}
+				if m, _ := strconv.ParseFloat(vStrArr[1], 64); err == nil {
+					mem = append(mem, m)
+				}
+				if d, _ := strconv.ParseFloat(vStrArr[2], 64); err == nil {
+					disk = append(disk, d)
+				}
+			}
+		}
+
+		if len(vals) < interval {
+			return
+		} else {
+			offset += interval
+		}
+	}
 }
 
 func (s *RedisStatistics) GetPackerStatistics(tickerCount int) (error, *[][]uint64) {
-	offset := int64(0)
-	result := make([][]uint64, 0)
+	offset := 0
+	interval := 5
+	result := make([][]uint64, 8)
 	for {
 		vals, e := s.Client.ZRangeByScore(s.ctx, "Packer", &redis.ZRangeBy{
-			Offset: offset,
-			Count:  5000,
+			Min: strconv.Itoa(offset),
+			Max: strconv.Itoa(offset + interval),
 		}).Result()
 
 		if e != nil {
@@ -167,19 +191,18 @@ func (s *RedisStatistics) GetPackerStatistics(tickerCount int) (error, *[][]uint
 
 		for _, v := range vals {
 			vStrArr := strings.Split(v, ",")
-			if len(vStrArr) == 3 {
-				for i, vStr := range vStrArr {
+			if len(vStrArr) == 9 {
+				for i, vStr := range vStrArr[0:8] {
 					vInt, _ := strconv.Atoi(vStr)
-					result[2*i] = append(result[2*i], uint64(vInt))
-					result[2*i+1] = append(result[2*i+1], uint64(vInt))
+					result[i] = append(result[i], uint64(vInt))
 				}
 			}
 		}
 
-		if len(vals) < 5000 {
+		if len(vals) < interval {
 			return nil, &result
 		} else {
-			offset += 5000
+			offset += interval
 		}
 	}
 }

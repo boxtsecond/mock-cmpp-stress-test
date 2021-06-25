@@ -64,12 +64,12 @@ func (s *Collection) Start() error {
 }
 
 func (s *Collection) Stop() error {
+	s.Graph()
 	if err := s.Service.Stop(); err != nil {
 		s.Logger.Error("Collect Service Stop Error.", zap.Error(err))
 	}
 	s.cancel()
 	s.Logger.Info("Collect Service Stop Success.")
-	s.Graph()
 	return nil
 }
 
@@ -194,6 +194,10 @@ func (s *Collection) GraphPackage() {
 	err, data := s.Service.GetPackerStatistics(s.TickerCount)
 	if err != nil {
 		s.Logger.Error("[Collect][GraphPackage] Error", zap.Error(err))
+		return
+	}
+
+	if len(*data) == 0 {
 		return
 	}
 

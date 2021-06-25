@@ -109,13 +109,12 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
 								}
 							}
-
+						}
+						if worker.Sleep > 0 {
+							time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
 						}
 					}
 				}(i)
-				if worker.Sleep > 0 {
-					time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
-				}
 			}
 			atomic.AddUint64(&count, 1)
 		case <-st.ctx.Done(): // if cancel() execute
@@ -157,14 +156,14 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 
 				go func(id uint64) {
 					for sendNum := uint64(0); sendNum < concurrency; sendNum++ {
-						mutex.Lock()
-						atomic.AddUint64(&total, 1)
-						if total >= worker.TotalNum+1 {
-							return
-						}
-						mutex.Unlock()
 						for _, msg := range *st.cfg.Messages {
-							st.Logger.Info("Stress Test Worker Start", zap.Uint64("WorkerNum", id))
+							mutex.Lock()
+							atomic.AddUint64(&total, 1)
+							if total >= worker.TotalNum+1 {
+								return
+							}
+							mutex.Unlock()
+							st.Logger.Info("Stress Test Worker Start", zap.Uint64("WorkerNum", id), zap.Uint64("Total", total))
 							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
 								err, _ := cmppClient.Cmpp2Submit(&msg)
 								if err != nil {
@@ -180,15 +179,14 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
 								}
 							}
-
+							if worker.Sleep > 0 {
+								time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
+							}
 						}
 					}
 				}(i)
-				if worker.Sleep > 0 {
-					time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
-				}
 			}
-		case <-st.ctx.Done(): // if cancel() execute
+		case <-st.ctx.Done():
 			return
 		}
 	}

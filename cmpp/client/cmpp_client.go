@@ -7,7 +7,6 @@ import (
 	"mock-cmpp-stress-test/config"
 	"net"
 	"strings"
-	"time"
 )
 
 var Clients = make(map[string]*pkg.CmppClientManager, 0)
@@ -26,16 +25,13 @@ func (s *CmppClient) Start() (err error) {
 	if !s.cfg.Enable {
 		return nil
 	}
-
-	version := s.cfg.Version
-	timeout := time.Duration(s.cfg.TimeOut) * time.Second
 	errCount := 0
 
 	for _, account := range *s.cfg.Accounts {
 		cm := &pkg.CmppClientManager{}
 		addr := fmt.Sprintf("%s:%d", account.Ip, account.Port)
 
-		initErr := cm.Init(version, addr, account.Username, account.Password, account.SpID, account.SpCode, s.cfg.Retries, timeout)
+		initErr := cm.Init(s.cfg, addr, account)
 		if initErr != nil {
 			s.Logger.Error("Cmpp Client Init Error",
 				zap.String("UserName", account.Username),
@@ -78,7 +74,7 @@ func (s *CmppClient) Stop() error {
 func (s *CmppClient) ClientReceive(cm *pkg.CmppClientManager) {
 	errCount := 0
 	for {
-		if errCount > 3 {
+		if errCount >= 3 {
 			s.Logger.Error("[CmppClient][ReceivePkgs] Error And Reconnect",
 				zap.String("UserName", cm.UserName),
 				zap.String("Address", cm.Addr),
@@ -94,6 +90,7 @@ func (s *CmppClient) ClientReceive(cm *pkg.CmppClientManager) {
 			go s.ClientReceive(cm)
 			return
 		}
+
 		select {
 		case <-cm.Ctx.Done():
 			return
@@ -104,7 +101,7 @@ func (s *CmppClient) ClientReceive(cm *pkg.CmppClientManager) {
 				if e, ok := err.(net.Error); ok && e.Timeout() {
 					continue
 				}
-				errCount += 1
+				errCount = 3
 				s.Logger.Error("[CmppClient][ReceivePkgs] Error",
 					zap.String("UserName", cm.UserName),
 					zap.String("Address", cm.Addr),
