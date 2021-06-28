@@ -197,7 +197,7 @@ func (s *Collection) GraphPackage() {
 		return
 	}
 
-	if len(*data) == 0 {
+	if len((*data)[0]) == 0 {
 		return
 	}
 

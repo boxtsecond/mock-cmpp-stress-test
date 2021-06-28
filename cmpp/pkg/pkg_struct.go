@@ -7,6 +7,7 @@ import (
 	"math"
 	"mock-cmpp-stress-test/utils/cache"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -46,6 +47,7 @@ type CmppServerManager struct {
 	ConnMap       map[string]*cmpp.Conn // 连接池
 	UserMap       map[string]*Conn      // 用户map
 	Cache         *cache.Cache          // 记录发送的key和client的对应的关系
+	lock          sync.Mutex
 }
 
 type Conn struct {

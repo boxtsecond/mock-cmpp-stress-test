@@ -15,6 +15,9 @@ import (
 
 // =====================CmppClient=====================
 // =====================Cmpp2Submit=====================
+var Cmpp2SubmitChan = make(chan *cmpp.Cmpp2SubmitReqPkt, 500)
+var Cmpp3SubmitChan = make(chan *cmpp.Cmpp3SubmitReqPkt, 500)
+
 func (cm *CmppClientManager) GetCmppSubmit2ReqPkg(message *config.TextMessages) ([]*cmpp.Cmpp2SubmitReqPkt, error) {
 	packets := make([]*cmpp.Cmpp2SubmitReqPkt, 0)
 	content, err := cmpputils.Utf8ToUcs2(message.Content)
@@ -61,29 +64,22 @@ func (cm *CmppClientManager) GetCmppSubmit2ReqPkg(message *config.TextMessages) 
 	return packets, nil
 }
 
-func (cm *CmppClientManager) Cmpp2Submit(message *config.TextMessages) (error, []uint32) {
+func (cm *CmppClientManager) Cmpp2Submit(message *config.TextMessages) error {
 	pkgs, err := cm.GetCmppSubmit2ReqPkg(message)
-	seqIds := make([]uint32, 0)
 	if err != nil {
 		log.Logger.Error("[CmppClient][GetCmppSubmit2ReqPkg] Error:", zap.Error(err))
-		return err, seqIds
+		return err
 	}
 
 	for _, pkg := range pkgs {
-		seqId, sendErr := cm.Client.SendReqPkt(pkg)
-		if sendErr != nil {
-			log.Logger.Error("[CmppClient][Cmpp2Submit] Error", zap.Error(sendErr))
-			return sendErr, seqIds
-		}
-		seqIds = append(seqIds, seqId)
-		setCacheErr := cm.Cache.Set(strconv.Itoa(int(seqId)), strings.Join([]string{cm.Addr, cm.UserName, cm.SpId, cm.SpCode, message.Phone}, ","))
-		if setCacheErr != nil {
-			log.Logger.Error("[CmppClient][Cmpp2Submit][SetCache] Error:", zap.Error(setCacheErr))
-		}
-		log.Logger.Info("[CmppClient][Cmpp2Submit] Success", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("SpId", cm.SpId), zap.String("SpCode", cm.SpCode), zap.String("Phone", message.Phone), zap.Any("SeqIds", seqIds))
+		cm.SendCmpp2SubmitPkg(pkg)
 	}
 
-	return nil, seqIds
+	return nil
+}
+
+func (sm *CmppClientManager) SendCmpp2SubmitPkg(pkg *cmpp.Cmpp2SubmitReqPkt) {
+	Cmpp2SubmitChan <- pkg
 }
 
 func (cm *CmppClientManager) Cmpp2SubmitResp(resp *cmpp.Cmpp2SubmitRspPkt) error {
@@ -173,27 +169,14 @@ func (cm *CmppClientManager) Cmpp3Submit(message *config.TextMessages) (error, [
 		return err, seqIds
 	}
 	for _, pkg := range pkgs {
-		seqId, sendErr := cm.Client.SendReqPkt(pkg)
-		if sendErr != nil {
-			log.Logger.Error("[CmppClient][Cmpp3Submit] Error:", zap.Error(sendErr))
-			return sendErr, seqIds
-		}
-
-		seqIds = append(seqIds, seqId)
-		setCacheErr := cm.Cache.Set(strconv.Itoa(int(seqId)), strings.Join([]string{cm.Addr, cm.UserName, cm.SpId, cm.SpCode, message.Phone}, ","))
-		if setCacheErr != nil {
-			log.Logger.Error("[CmppClient][Cmpp3Submit][SetCache] Error:", zap.Error(setCacheErr))
-		}
+		cm.SendCmpp3SubmitPkg(pkg)
 	}
-	log.Logger.Info("[CmppClient][Cmpp3Submit] Success",
-		zap.String("Addr", cm.Addr),
-		zap.String("UserName", cm.UserName),
-		zap.String("SpId", cm.SpId),
-		zap.String("SpCode", cm.SpCode),
-		zap.String("Phone", message.Phone),
-		zap.Any("SeqIds", seqIds))
 
 	return nil, seqIds
+}
+
+func (sm *CmppClientManager) SendCmpp3SubmitPkg(pkg *cmpp.Cmpp3SubmitReqPkt) {
+	Cmpp3SubmitChan <- pkg
 }
 
 func (cm *CmppClientManager) Cmpp3SubmitResp(resp *cmpp.Cmpp3SubmitRspPkt) error {

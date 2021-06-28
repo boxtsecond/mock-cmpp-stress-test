@@ -54,6 +54,7 @@ func (s *CmppClient) Start() (err error) {
 		key := strings.Join([]string{addr, account.Username}, "_")
 		Clients[key] = cm
 		go cm.KeepAlive()
+		go cm.StartSubmit()
 	}
 
 	if errCount == 0 {
@@ -87,6 +88,7 @@ func (s *CmppClient) ClientReceive(cm *pkg.CmppClientManager) {
 				return
 			}
 			go cm.KeepAlive()
+			go cm.StartSubmit()
 			go s.ClientReceive(cm)
 			return
 		}

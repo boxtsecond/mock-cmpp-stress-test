@@ -36,6 +36,11 @@ func (s *RedisStatistics) Start() error {
 	}
 
 	s.ClearKeys()
+	err := s.InitKeys()
+	if err != nil {
+		s.Logger.Fatal("Redis InitKeys Error", zap.Error(err))
+		return err
+	}
 	return nil
 }
 
@@ -48,6 +53,24 @@ func (s *RedisStatistics) ClearKeys() {
 		"DeliverResp_Total", "DeliverResp_Success",
 	}
 	s.Client.Del(s.ctx, keys...)
+}
+
+func (s *RedisStatistics) InitKeys() error {
+	keys := []string{
+		"Submit_Total", "Submit_Success",
+		"SubmitResp_Total", "SubmitResp_Success",
+		"Deliver_Total", "Deliver_Success",
+		"DeliverResp_Total", "DeliverResp_Success",
+	}
+	pipeline := s.Client.Pipeline()
+	for _, k := range keys {
+		pipeline.Set(s.ctx, k, 0, 0)
+	}
+	_, err := pipeline.Exec(s.ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *RedisStatistics) Stop() error {
@@ -77,13 +100,21 @@ func (s *RedisStatistics) SaveMachineStatistics(tickerCount int, cpu, mem, disk 
 }
 
 func (s *RedisStatistics) SavePackerStatistics(tickerCount int) error {
-	pipeline := s.Client.Pipeline()
-	keys := []string{
-		"Submit_Total", "Submit_Success",
-		"SubmitResp_Total", "SubmitResp_Success",
-		"Deliver_Total", "Deliver_Success",
-		"DeliverResp_Total", "DeliverResp_Success",
+	keys := make([]string, 0)
+	if config.ConfigObj.ClientConfig.Enable {
+		keys = []string{
+			"Submit_Total", "Submit_Success",
+			"SubmitResp_Total", "SubmitResp_Success",
+			"Deliver_Total", "Deliver_Success",
+			//"DeliverResp_Total", "DeliverResp_Success",
+		}
 	}
+
+	if config.ConfigObj.ServerConfig.Enable {
+		keys = append(keys, []string{"DeliverResp_Total", "DeliverResp_Success"}...)
+	}
+
+	pipeline := s.Client.Pipeline()
 	for _, k := range keys {
 		pipeline.Get(s.ctx, k)
 	}
@@ -189,10 +220,19 @@ func (s *RedisStatistics) GetPackerStatistics(tickerCount int) (error, *[][]uint
 			return e, nil
 		}
 
+		keyLen := 0
+		if config.ConfigObj.ClientConfig.Enable {
+			keyLen = 6
+		}
+
+		if config.ConfigObj.ServerConfig.Enable {
+			keyLen += 2
+		}
+
 		for _, v := range vals {
 			vStrArr := strings.Split(v, ",")
-			if len(vStrArr) == 9 {
-				for i, vStr := range vStrArr[0:8] {
+			if len(vStrArr) == keyLen+1 {
+				for i, vStr := range vStrArr[0:keyLen] {
 					vInt, _ := strconv.Atoi(vStr)
 					result[i] = append(result[i], uint64(vInt))
 				}

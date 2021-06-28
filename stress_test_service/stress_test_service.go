@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/client"
 	"mock-cmpp-stress-test/config"
-	"mock-cmpp-stress-test/statistics"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -95,19 +94,9 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 					for sendNum := uint64(0); sendNum < concurrency; sendNum++ {
 						for _, msg := range *st.cfg.Messages {
 							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
-								err, _ := cmppClient.Cmpp2Submit(&msg)
-								if err != nil {
-									statistics.CollectService.Service.AddPackerStatistics("Submit", false)
-								} else {
-									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
-								}
+								cmppClient.Cmpp2Submit(&msg)
 							} else if cmppClient.Version == cmpp.V30 {
-								err, _ := cmppClient.Cmpp3Submit(&msg)
-								if err != nil {
-									statistics.CollectService.Service.AddPackerStatistics("Submit", false)
-								} else {
-									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
-								}
+								cmppClient.Cmpp3Submit(&msg)
 							}
 						}
 						if worker.Sleep > 0 {
@@ -165,19 +154,9 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 							mutex.Unlock()
 							st.Logger.Info("Stress Test Worker Start", zap.Uint64("WorkerNum", id), zap.Uint64("Total", total))
 							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
-								err, _ := cmppClient.Cmpp2Submit(&msg)
-								if err != nil {
-									statistics.CollectService.Service.AddPackerStatistics("Submit", false)
-								} else {
-									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
-								}
+								cmppClient.Cmpp2Submit(&msg)
 							} else if cmppClient.Version == cmpp.V30 {
-								err, _ := cmppClient.Cmpp3Submit(&msg)
-								if err != nil {
-									statistics.CollectService.Service.AddPackerStatistics("Submit", false)
-								} else {
-									statistics.CollectService.Service.AddPackerStatistics("Submit", true)
-								}
+								cmppClient.Cmpp3Submit(&msg)
 							}
 							if worker.Sleep > 0 {
 								time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)

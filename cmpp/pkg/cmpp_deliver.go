@@ -37,6 +37,69 @@ func (cm *CmppClientManager) Cmpp3DeliverReq(pkg *cmpp.Cmpp3DeliverReqPkt) error
 	}, pkg.SeqId)
 }
 
+func (cm *CmppClientManager) BatchCmpp2Submit(pkgs []*cmpp.Cmpp2SubmitReqPkt) {
+	for _, each := range pkgs {
+		cm.Cmpp2SubmitPkg(each)
+	}
+}
+
+func (cm *CmppClientManager) Cmpp2SubmitPkg(pkg *cmpp.Cmpp2SubmitReqPkt) error {
+	seqId, sendErr := cm.Client.SendReqPkt(pkg)
+	if sendErr != nil {
+		log.Logger.Error("[CmppClient][Cmpp2Submit] Error", zap.Error(sendErr))
+		statistics.CollectService.Service.AddPackerStatistics("Submit", false)
+		return sendErr
+	}
+	phone := pkg.DestTerminalId[0]
+	setCacheErr := cm.Cache.Set(strconv.Itoa(int(seqId)), strings.Join([]string{cm.Addr, cm.UserName, cm.SpId, cm.SpCode, phone}, ","))
+	if setCacheErr != nil {
+		log.Logger.Error("[CmppClient][Cmpp2Submit][SetCache] Error:", zap.Error(setCacheErr))
+		statistics.CollectService.Service.AddPackerStatistics("Submit", false)
+		return setCacheErr
+	}
+	statistics.CollectService.Service.AddPackerStatistics("Submit", true)
+	log.Logger.Info("[CmppClient][Cmpp2Submit] Success",
+		zap.String("Addr", cm.Addr),
+		zap.String("UserName", cm.UserName),
+		zap.String("SpId", cm.SpId),
+		zap.String("SpCode", cm.SpCode),
+		zap.String("Phone", phone),
+		zap.Any("SeqId", seqId))
+	return nil
+}
+
+func (cm *CmppClientManager) BatchCmpp3Submit(pkgs []*cmpp.Cmpp3SubmitReqPkt) {
+	for _, each := range pkgs {
+		cm.Cmpp3SubmitPkg(each)
+	}
+}
+
+func (cm *CmppClientManager) Cmpp3SubmitPkg(pkg *cmpp.Cmpp3SubmitReqPkt) error {
+	seqId, sendErr := cm.Client.SendReqPkt(pkg)
+	if sendErr != nil {
+		log.Logger.Error("[CmppClient][Cmpp3Submit] Error", zap.Error(sendErr))
+		statistics.CollectService.Service.AddPackerStatistics("Submit", false)
+		return sendErr
+	}
+	phone := pkg.DestTerminalId[0]
+	setCacheErr := cm.Cache.Set(strconv.Itoa(int(seqId)), strings.Join([]string{cm.Addr, cm.UserName, cm.SpId, cm.SpCode, phone}, ","))
+	if setCacheErr != nil {
+		log.Logger.Error("[CmppClient][Cmpp3Submit][SetCache] Error:", zap.Error(setCacheErr))
+		statistics.CollectService.Service.AddPackerStatistics("Submit", false)
+		return setCacheErr
+	}
+
+	log.Logger.Info("[CmppClient][Cmpp3Submit] Success",
+		zap.String("Addr", cm.Addr),
+		zap.String("UserName", cm.UserName),
+		zap.String("SpId", cm.SpId),
+		zap.String("SpCode", cm.SpCode),
+		zap.String("Phone", phone),
+		zap.Any("SeqId", seqId))
+	statistics.CollectService.Service.AddPackerStatistics("Submit", true)
+	return nil
+}
+
 // =====================CmppClient=====================
 
 // =====================CmppServer=====================

@@ -140,6 +140,54 @@ func (cm *CmppClientManager) KeepAlive() {
 
 }
 
+func (cm *CmppClientManager) StartSubmit() {
+	cmpp2SubmitPkgs := make([]*cmpp.Cmpp2SubmitReqPkt, 0)
+	cmpp3SubmitPkgs := make([]*cmpp.Cmpp3SubmitReqPkt, 0)
+	tk := time.NewTicker(1 * time.Second)
+
+	defer func() {
+		tk.Stop()
+		if len(cmpp2SubmitPkgs) > 0 {
+			cm.BatchCmpp2Submit(cmpp2SubmitPkgs)
+		}
+
+		if len(cmpp3SubmitPkgs) > 0 {
+			cm.BatchCmpp3Submit(cmpp3SubmitPkgs)
+		}
+	}()
+
+	for {
+		select {
+		case cmpp2Submit := <-Cmpp2SubmitChan:
+			cmpp2SubmitPkgs = append(cmpp2SubmitPkgs, cmpp2Submit)
+			if len(cmpp2SubmitPkgs) >= 100 {
+				cm.BatchCmpp2Submit(cmpp2SubmitPkgs)
+				cmpp2SubmitPkgs = cmpp2SubmitPkgs[:0]
+			}
+
+		case cmpp3Submit := <-Cmpp3SubmitChan:
+			cmpp3SubmitPkgs = append(cmpp3SubmitPkgs, cmpp3Submit)
+			if len(cmpp3SubmitPkgs) >= 100 {
+				cm.BatchCmpp3Submit(cmpp3SubmitPkgs)
+				cmpp3SubmitPkgs = cmpp3SubmitPkgs[:0]
+
+			}
+		case <-tk.C:
+			if len(cmpp2SubmitPkgs) > 0 {
+				cm.BatchCmpp2Submit(cmpp2SubmitPkgs)
+				cmpp2SubmitPkgs = cmpp2SubmitPkgs[:0]
+			}
+
+			if len(cmpp3SubmitPkgs) > 0 {
+				cm.BatchCmpp3Submit(cmpp3SubmitPkgs)
+				cmpp3SubmitPkgs = cmpp3SubmitPkgs[:0]
+			}
+		case <-cm.Ctx.Done():
+			return
+		}
+	}
+}
+
 // =====================CmppClient=====================
 
 // =====================CmppServer=====================
@@ -243,8 +291,11 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 			resp.AuthIsmg = authIsmg
 		}
 	}
+
+	sm.lock.Lock()
 	sm.ConnMap[addr] = req.Conn
 	sm.UserMap[addr] = &Conn{UserName: account.UserName, password: account.Password, spCode: account.SpCode, spId: account.SpId}
+	sm.lock.Unlock()
 
 	log.Logger.Info("[CmppServer][Login] Success",
 		zap.String("UserName", pkg.SrcAddr),
