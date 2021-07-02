@@ -2,17 +2,24 @@ package statistics
 
 import (
 	"context"
+	"fmt"
 	"go.uber.org/zap"
+	"mock-cmpp-stress-test/config"
 	"sync/atomic"
 )
 
 type Statistics struct {
-	Logger      *zap.Logger
-	Machine     *MachineStatistics
-	Submit      *PackerStatistics
-	SubmitResp  *PackerStatistics
-	Deliver     *PackerStatistics
-	DeliverResp *PackerStatistics
+	Logger            *zap.Logger
+	Machine           *MachineStatistics
+	ClientSubmit      *PackerStatistics
+	ClientSubmitResp  *PackerStatistics
+	ClientDeliver     *PackerStatistics
+	ClientDeliverResp *PackerStatistics
+
+	ServerSubmit      *PackerStatistics
+	ServerSubmitResp  *PackerStatistics
+	ServerDeliver     *PackerStatistics
+	ServerDeliverResp *PackerStatistics
 }
 
 type MachineStatistics struct {
@@ -41,19 +48,36 @@ func (s *Statistics) Init(log *zap.Logger, ctx context.Context) {
 		Item:       s.NewDefaultItem(),
 		Statistics: make([][]float64, DefaultMaxStatisticsCount),
 	}
-	s.Submit = &PackerStatistics{
+	s.ClientSubmit = &PackerStatistics{
 		Item:       s.NewDefaultItem(),
 		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
 	}
-	s.SubmitResp = &PackerStatistics{
+	s.ClientSubmitResp = &PackerStatistics{
 		Item:       s.NewDefaultItem(),
 		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
 	}
-	s.Deliver = &PackerStatistics{
+	s.ClientDeliver = &PackerStatistics{
 		Item:       s.NewDefaultItem(),
 		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
 	}
-	s.DeliverResp = &PackerStatistics{
+	s.ClientDeliverResp = &PackerStatistics{
+		Item:       s.NewDefaultItem(),
+		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
+	}
+
+	s.ServerSubmit = &PackerStatistics{
+		Item:       s.NewDefaultItem(),
+		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
+	}
+	s.ServerSubmitResp = &PackerStatistics{
+		Item:       s.NewDefaultItem(),
+		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
+	}
+	s.ServerDeliver = &PackerStatistics{
+		Item:       s.NewDefaultItem(),
+		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
+	}
+	s.ServerDeliverResp = &PackerStatistics{
 		Item:       s.NewDefaultItem(),
 		Statistics: make([][]uint64, DefaultMaxStatisticsCount),
 	}
@@ -88,10 +112,15 @@ func (s *Statistics) SaveMachineStatistics(tickerCount int, cpu, mem, disk float
 }
 
 func (s *Statistics) SavePackerStatistics(tickerCount int) error {
-	s.Submit.SavePackerStatistics(tickerCount)
-	s.SubmitResp.SavePackerStatistics(tickerCount)
-	s.Deliver.SavePackerStatistics(tickerCount)
-	s.DeliverResp.SavePackerStatistics(tickerCount)
+	s.ClientSubmit.SavePackerStatistics(tickerCount)
+	s.ClientSubmitResp.SavePackerStatistics(tickerCount)
+	s.ClientDeliver.SavePackerStatistics(tickerCount)
+	s.ClientDeliverResp.SavePackerStatistics(tickerCount)
+
+	s.ServerSubmit.SavePackerStatistics(tickerCount)
+	s.ServerSubmitResp.SavePackerStatistics(tickerCount)
+	s.ServerDeliver.SavePackerStatistics(tickerCount)
+	s.ServerDeliverResp.SavePackerStatistics(tickerCount)
 	return nil
 }
 
@@ -104,16 +133,26 @@ func (ps *PackerStatistics) SavePackerStatistics(tickerCount int) {
 	ps.Statistics[index] = []uint64{ps.Total, ps.Success}
 }
 
-func (s *Statistics) AddPackerStatistics(name string, success bool) {
-	switch name {
-	case "Submit":
-		s.Submit.AddPackerStatistics(success)
-	case "SubmitResp":
-		s.SubmitResp.AddPackerStatistics(success)
-	case "Deliver":
-		s.Deliver.AddPackerStatistics(success)
-	case "DeliverResp":
-		s.DeliverResp.AddPackerStatistics(success)
+func (s *Statistics) AddPackerStatistics(source, name string, success bool) {
+	key := fmt.Sprintf("%s_%s", source, name)
+	switch key {
+	case "Client_Submit":
+		s.ClientSubmit.AddPackerStatistics(success)
+	case "Client_SubmitResp":
+		s.ClientSubmitResp.AddPackerStatistics(success)
+	case "Client_Deliver":
+		s.ClientDeliver.AddPackerStatistics(success)
+	case "Client_DeliverResp":
+		s.ClientDeliverResp.AddPackerStatistics(success)
+
+	case "Server_Submit":
+		s.ServerSubmit.AddPackerStatistics(success)
+	case "Server_SubmitResp":
+		s.ServerSubmitResp.AddPackerStatistics(success)
+	case "Server_Deliver":
+		s.ServerDeliver.AddPackerStatistics(success)
+	case "Server_DeliverResp":
+		s.ServerDeliverResp.AddPackerStatistics(success)
 	}
 }
 
@@ -125,10 +164,20 @@ func (ps *PackerStatistics) AddPackerStatistics(success bool) {
 }
 
 func (s *Statistics) GetXAxisStart(tickerCount int) int {
-	if tickerCount <= s.Submit.MaxStatisticsCount {
-		return 0
+	if config.ConfigObj.ClientConfig.Enable {
+		if tickerCount <= s.ClientSubmit.MaxStatisticsCount {
+			return 0
+		}
+		return int(s.ClientSubmit.Head)
 	}
-	return int(s.Submit.Head)
+
+	if config.ConfigObj.ServerConfig.Enable {
+		if tickerCount <= s.ServerSubmit.MaxStatisticsCount {
+			return 0
+		}
+		return int(s.ServerSubmit.Head)
+	}
+	return 0
 }
 
 func (s *Statistics) GetXAxisLength(tickerCount int) int {
@@ -163,26 +212,47 @@ func (s *Statistics) GetMachineStatistics(tickerCount int) (err error, cpu, mem,
 func (s *Statistics) GetPackerStatistics(tickerCount int) (error, *[][]uint64) {
 	start := 0
 	total := tickerCount
-	result := make([][]uint64, 8)
+	result := make([][]uint64, 16)
 
-	if s.Submit.Head != 0 {
-		start = int(s.Submit.Head)
-		total = s.Submit.MaxStatisticsCount
+	if config.ConfigObj.ServerConfig.Enable {
+		if s.ServerSubmit.Head != 0 {
+			start = int(s.ServerSubmit.Head)
+			total = s.ServerSubmit.MaxStatisticsCount
+		}
+	}
+
+	if config.ConfigObj.ClientConfig.Enable {
+		if s.ClientSubmit.Head != 0 {
+			start = int(s.ClientSubmit.Head)
+			total = s.ClientSubmit.MaxStatisticsCount
+		}
 	}
 
 	for total > 0 {
-		index := (start + s.Submit.MaxStatisticsCount) % s.Submit.MaxStatisticsCount
-		result[0] = append(result[0], s.Submit.Statistics[index][0])
-		result[1] = append(result[1], s.Submit.Statistics[index][1])
+		index := (start + s.ClientSubmit.MaxStatisticsCount) % s.ClientSubmit.MaxStatisticsCount
+		result[0] = append(result[0], s.ClientSubmit.Statistics[index][0])
+		result[1] = append(result[1], s.ClientSubmit.Statistics[index][1])
 
-		result[2] = append(result[2], s.SubmitResp.Statistics[index][0])
-		result[3] = append(result[3], s.SubmitResp.Statistics[index][1])
+		result[2] = append(result[2], s.ClientSubmitResp.Statistics[index][0])
+		result[3] = append(result[3], s.ClientSubmitResp.Statistics[index][1])
 
-		result[4] = append(result[4], s.Deliver.Statistics[index][0])
-		result[5] = append(result[5], s.Deliver.Statistics[index][1])
+		result[4] = append(result[4], s.ClientDeliver.Statistics[index][0])
+		result[5] = append(result[5], s.ClientDeliver.Statistics[index][1])
 
-		result[6] = append(result[6], s.DeliverResp.Statistics[index][0])
-		result[7] = append(result[7], s.DeliverResp.Statistics[index][1])
+		result[6] = append(result[6], s.ClientDeliverResp.Statistics[index][0])
+		result[7] = append(result[7], s.ClientDeliverResp.Statistics[index][1])
+
+		result[8] = append(result[8], s.ServerSubmit.Statistics[index][0])
+		result[9] = append(result[9], s.ServerSubmit.Statistics[index][1])
+
+		result[10] = append(result[10], s.ServerSubmitResp.Statistics[index][0])
+		result[11] = append(result[11], s.ServerSubmitResp.Statistics[index][1])
+
+		result[12] = append(result[12], s.ServerDeliver.Statistics[index][0])
+		result[13] = append(result[13], s.ServerDeliver.Statistics[index][1])
+
+		result[14] = append(result[14], s.ServerDeliverResp.Statistics[index][0])
+		result[15] = append(result[15], s.ServerDeliverResp.Statistics[index][1])
 		total -= 1
 		start += 1
 	}

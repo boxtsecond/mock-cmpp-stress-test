@@ -5,17 +5,22 @@ import (
 	"context"
 	"crypto/md5"
 	"errors"
-	cmpp "github.com/bigwhite/gocmpp"
-	cmpputils "github.com/bigwhite/gocmpp/utils"
 	"go.uber.org/zap"
 	_log "log"
-	"mock-cmpp-stress-test/cmpp/cron_cache"
-	"mock-cmpp-stress-test/config"
-	"mock-cmpp-stress-test/utils/cache"
-	"mock-cmpp-stress-test/utils/log"
 	"net"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
+
+	cmpp "github.com/bigwhite/gocmpp"
+	cmpputils "github.com/bigwhite/gocmpp/utils"
+	"mock-cmpp-stress-test/config"
+	"mock-cmpp-stress-test/utils/cron_cache"
+	"mock-cmpp-stress-test/utils/log"
 )
+
+var Clients = make(map[string]*CmppClientManager, 0)
 
 // =====================CmppClient=====================
 func (cm *CmppClientManager) Init(cfg *config.CmppClientConfig, addr string, account config.CmppAccount) error {
@@ -28,21 +33,17 @@ func (cm *CmppClientManager) Init(cfg *config.CmppClientConfig, addr string, acc
 	cm.Version = v
 	cm.UserName = account.Username
 	cm.Password = account.Password
-	cm.Retries = cfg.Retries
 	cm.Timeout = time.Duration(cfg.TimeOut) * time.Second
 	cm.ActiveTestInterval = time.Duration(cfg.ActiveTestInterval) * time.Millisecond
 	cm.SpId = account.SpID
 	cm.SpCode = account.SpCode
-	cm.Cache = (&cache.Cache{}).New(1e4)
-
-	if cm.Retries == 0 {
-		cm.Retries = defaultRetries
-	}
 
 	if cm.Timeout > defaultTimeout {
 		cm.Timeout = defaultTimeout
 	}
 	cm.Ctx, cm.cancel = context.WithCancel(context.Background())
+	cm.Cmpp2SubmitChan = make(chan *cmpp.Cmpp2SubmitReqPkt, 500)
+	cm.Cmpp3SubmitChan = make(chan *cmpp.Cmpp3SubmitReqPkt, 500)
 	return nil
 }
 
@@ -53,23 +54,22 @@ func (cm *CmppClientManager) Connect() error {
 	err := cm.Client.Connect(cm.Addr, cm.UserName, cm.Password, cm.Timeout)
 	if err != nil {
 		log.Logger.Error("[CmppClient][Connect] Error",
-			zap.Uint("Retries", cm.Retries),
+			zap.String("Addr", cm.Addr),
+			zap.String("UserName", cm.UserName),
 			zap.Error(err))
-		if cm.Retries <= 0 {
-			return err
-		}
-		cm.Retries -= 1
-		return cm.Connect()
+		return err
 	}
 	cm.Connected = true
 	log.Logger.Info("[CmppClient][Connect] Success.", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("Password", cm.Password))
+	go cm.KeepAlive()
+	go cm.StartSubmit()
+	go cm.StartClientReceive()
 	return nil
 }
 
 func (cm *CmppClientManager) Disconnect() {
-	cm.Client.Disconnect()
-	cm.Connected = false
 	cm.cancel()
+	cm.Client.Disconnect()
 	log.Logger.Info("[CmppClient][Disconnect] Success", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("Password", cm.Password))
 }
 
@@ -101,7 +101,7 @@ func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
 
 // 客户端发送心跳检测请求
 func (cm *CmppClientManager) KeepAlive() {
-	retries := 0
+	cm.ConnErrCount = 0
 	tk := time.NewTicker(cm.ActiveTestInterval)
 
 	defer func() {
@@ -119,17 +119,17 @@ func (cm *CmppClientManager) KeepAlive() {
 		err := cm.SendCmppActiveTestReq(&cmpp.CmppActiveTestReqPkt{})
 		if err != nil {
 			log.Logger.Error("[CmppClient][KeepAlive] Check Alive Error", zap.Error(err), zap.String("UserName", cm.UserName))
-			retries += 1
+			cm.ConnErrCount += 1
 		} else {
-			retries = 0
+			cm.ConnErrCount = 0
 		}
 
 		select {
 		case <-tk.C:
-			if retries > 3 {
+			if cm.ConnErrCount > 3 {
 				log.Logger.Error("[CmppClient][KeepAlive] KeepAlive Error", zap.String("UserName", cm.UserName))
 				cm.Connected = false
-				go cm.Connect()
+				go cm.Reconnect()
 				return
 			}
 
@@ -138,6 +138,53 @@ func (cm *CmppClientManager) KeepAlive() {
 		}
 	}
 
+}
+
+func (cm *CmppClientManager) Reconnect() {
+	cm.cancel()
+	time.Sleep(100 * time.Millisecond)
+
+	ncm := &CmppClientManager{}
+	addrArr := strings.Split(cm.Addr, ":")
+	port, _ := strconv.Atoi(addrArr[1])
+	naccount := config.CmppAccount{
+		Username: cm.UserName,
+		Password: cm.Password,
+		Ip:       addrArr[0],
+		Port:     uint16(port),
+		SpID:     cm.SpId,
+		SpCode:   cm.SpCode,
+	}
+
+	initErr := ncm.Init(config.ConfigObj.ClientConfig, cm.Addr, naccount)
+	if initErr != nil {
+		log.Logger.Error("Cmpp Client Reconnect Init Error",
+			zap.String("UserName", naccount.Username),
+			zap.String("Address", cm.Addr),
+			zap.Error(initErr))
+		return
+	}
+	log.Logger.Info("Cmpp Client Reconnect Init Success",
+		zap.String("UserName", naccount.Username),
+		zap.String("Address", cm.Addr))
+
+	err := ncm.Connect()
+	if err != nil {
+		log.Logger.Error("Cmpp Client Reconnect Error",
+			zap.String("UserName", ncm.UserName),
+			zap.String("Address", ncm.Addr),
+			zap.Error(err))
+		ncm.Connected = false
+		return
+	}
+
+	log.Logger.Error("Cmpp Client Reconnect Success",
+		zap.String("UserName", ncm.UserName),
+		zap.String("Address", ncm.Addr))
+
+	key := strings.Join([]string{ncm.Addr, ncm.UserName}, "_")
+	Clients[key] = ncm
+	return
 }
 
 func (cm *CmppClientManager) StartSubmit() {
@@ -157,17 +204,21 @@ func (cm *CmppClientManager) StartSubmit() {
 	}()
 
 	for {
+		if !cm.Connected {
+			return
+		}
+
 		select {
-		case cmpp2Submit := <-Cmpp2SubmitChan:
+		case cmpp2Submit := <-cm.Cmpp2SubmitChan:
 			cmpp2SubmitPkgs = append(cmpp2SubmitPkgs, cmpp2Submit)
-			if len(cmpp2SubmitPkgs) >= 100 {
+			if len(cmpp2SubmitPkgs) >= 1000 {
 				cm.BatchCmpp2Submit(cmpp2SubmitPkgs)
 				cmpp2SubmitPkgs = cmpp2SubmitPkgs[:0]
 			}
 
-		case cmpp3Submit := <-Cmpp3SubmitChan:
+		case cmpp3Submit := <-cm.Cmpp3SubmitChan:
 			cmpp3SubmitPkgs = append(cmpp3SubmitPkgs, cmpp3Submit)
-			if len(cmpp3SubmitPkgs) >= 100 {
+			if len(cmpp3SubmitPkgs) >= 1000 {
 				cm.BatchCmpp3Submit(cmpp3SubmitPkgs)
 				cmpp3SubmitPkgs = cmpp3SubmitPkgs[:0]
 
@@ -188,9 +239,76 @@ func (cm *CmppClientManager) StartSubmit() {
 	}
 }
 
+func (cm *CmppClientManager) StartClientReceive() {
+	errCount := 0
+	for {
+		select {
+		case <-cm.Ctx.Done():
+			return
+		default:
+			if errCount > 3 {
+				log.Logger.Error("[CmppClient][ReceivePkgs] Error And Reconnect",
+					zap.String("UserName", cm.UserName),
+					zap.String("Address", cm.Addr),
+					zap.Int("errCount", errCount))
+				cm.Connected = false
+				go cm.Reconnect()
+				return
+			}
+
+			receivePkg, err := cm.Client.RecvAndUnpackPkt(cm.Timeout)
+			if err != nil {
+				// RecvAndUnpackPkt 长时间没收到包之后会报 timeout，忽略 timeout 错误
+				if e, ok := err.(net.Error); ok && e.Timeout() {
+					continue
+				}
+				errCount = 4
+				log.Logger.Error("[CmppClient][ReceivePkgs] Error",
+					zap.String("UserName", cm.UserName),
+					zap.String("Address", cm.Addr),
+					zap.Error(err))
+				continue
+			}
+			receiveErr := cm.ReceivePkg(receivePkg)
+			if receiveErr != nil {
+				errCount += 1
+				log.Logger.Error("[CmppClient][ReceivePkgs] Error",
+					zap.String("UserName", cm.UserName),
+					zap.String("Address", cm.Addr),
+					zap.Any("Pkg", receivePkg),
+					zap.Error(err))
+				continue
+			}
+			errCount = 0
+			cm.ConnErrCount = 0
+		}
+	}
+}
+
 // =====================CmppClient=====================
 
 // =====================CmppServer=====================
+
+func newSubmitSeqIdGenerator() (<-chan uint16, chan<- struct{}) {
+	seqId := make(chan uint16, 500)
+	done := make(chan struct{})
+
+	go func() {
+		var i uint16
+		for {
+			select {
+			case seqId <- i:
+				i++
+			case <-done:
+				close(seqId)
+				return
+			}
+		}
+	}()
+
+	return seqId, done
+}
+
 func (sm *CmppServerManager) Init(version, addr string) error {
 	v := GetVersion(version)
 	if v == InvalidVersion {
@@ -202,14 +320,14 @@ func (sm *CmppServerManager) Init(version, addr string) error {
 
 	sm.Addr = addr
 	sm.Version = v
-	sm.Cache = (&cache.Cache{}).New(1e4)
 
 	cfg := config.ConfigObj.ServerConfig
 	sm.heartbeat = time.Duration(cfg.HeartBeat) * time.Second // 每秒心跳检测
 	sm.maxNoRespPkgs = int32(cfg.MaxNoRspPkgs)
-	sm.ConnMap = make(map[string]*cmpp.Conn)
-	sm.UserMap = make(map[string]*Conn)
+	sm.ConnMap = &sync.Map{}
+	sm.UserMap = &sync.Map{}
 
+	sm.SubmitSeqId, sm.SubmitDone = newSubmitSeqIdGenerator()
 	return nil
 }
 
@@ -292,13 +410,13 @@ func (sm *CmppServerManager) Connect(req *cmpp.Packet, res *cmpp.Response) (bool
 		}
 	}
 
-	sm.lock.Lock()
-	sm.ConnMap[addr] = req.Conn
-	sm.UserMap[addr] = &Conn{UserName: account.UserName, password: account.Password, spCode: account.SpCode, spId: account.SpId}
-	sm.lock.Unlock()
+	sm.ConnMap.Store(addr, req)
+	sm.UserMap.Store(addr, &Conn{UserName: account.UserName, password: account.Password, spCode: account.SpCode, spId: account.SpId})
 
 	log.Logger.Info("[CmppServer][Login] Success",
 		zap.String("UserName", pkg.SrcAddr),
+		zap.String("SpId", account.SpId),
+		zap.String("SpCode", account.SpCode),
 		zap.String("Address", addr))
 
 	return false, nil
@@ -308,6 +426,9 @@ func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet,
 	switch p := pkg.Packer.(type) {
 	case *cmpp.CmppConnReqPkt: // 处理cmpp连接请求
 		return sm.Connect(pkg, res)
+
+	case *cmpp.CmppActiveTestReqPkt:
+		return sm.CmppActiveTestReq(p, res)
 
 	case *cmpp.Cmpp2SubmitReqPkt:
 		return sm.Cmpp2Submit(pkg, res)
@@ -326,9 +447,11 @@ func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet,
 }
 
 func (sm *CmppServerManager) Stop() {
-	for _, conn := range sm.ConnMap {
-		conn.Close()
-	}
+	sm.ConnMap.Range(func(_, conn interface{}) bool {
+		c := conn.(*cmpp.Packet)
+		c.Conn.Close()
+		return true
+	})
 }
 
 // =====================CmppServer=====================

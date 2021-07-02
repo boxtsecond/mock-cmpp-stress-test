@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	cmpp "github.com/bigwhite/gocmpp"
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
@@ -28,12 +27,13 @@ func (s *CmppServer) Init(logger *zap.Logger) {
 
 // 启动cmpp服务
 func (s *CmppServer) Start() error {
-	defer func() {
-		csm.Stop()
-	}()
 	if !s.cfg.Enable {
 		return nil
 	}
+
+	defer func() {
+		csm.Stop()
+	}()
 	addr := fmt.Sprintf("%s:%d", s.cfg.IP, s.cfg.Port)
 	if err := csm.Init(s.cfg.Version, addr); err != nil {
 		s.Logger.Error("Cmpp Server Init Error",
@@ -54,6 +54,9 @@ func (s *CmppServer) Start() error {
 }
 
 func (s *CmppServer) Stop() error {
+	if !s.cfg.Enable {
+		return nil
+	}
 	// 关闭当前所有连接
 	csm.Stop()
 	s.Logger.Info("Cmpp Server Stop Success")
@@ -61,8 +64,8 @@ func (s *CmppServer) Stop() error {
 }
 
 func (s *CmppServer) StartDeliver() {
-	cmpp2DeliverPkgs := make([]*cmpp.Cmpp2DeliverReqPkt, 0)
-	cmpp3DeliverPkgs := make([]*cmpp.Cmpp3DeliverReqPkt, 0)
+	cmpp2DeliverPkgs := make([]*pkg.MockCmpp2DeliverPkg, 0)
+	cmpp3DeliverPkgs := make([]*pkg.MockCmpp3DeliverPkg, 0)
 	tk := time.NewTicker(1 * time.Second)
 
 	defer func() {
@@ -80,14 +83,14 @@ func (s *CmppServer) StartDeliver() {
 		select {
 		case cmpp2Deliver := <-pkg.Cmpp2DeliverChan:
 			cmpp2DeliverPkgs = append(cmpp2DeliverPkgs, cmpp2Deliver)
-			if len(cmpp2DeliverPkgs) >= 100 {
+			if len(cmpp2DeliverPkgs) >= 500 {
 				csm.BatchCmpp2Deliver(cmpp2DeliverPkgs)
 				cmpp2DeliverPkgs = cmpp2DeliverPkgs[:0]
 			}
 
 		case cmpp3Deliver := <-pkg.Cmpp3DeliverChan:
 			cmpp3DeliverPkgs = append(cmpp3DeliverPkgs, cmpp3Deliver)
-			if len(cmpp3DeliverPkgs) >= 100 {
+			if len(cmpp3DeliverPkgs) >= 500 {
 				csm.BatchCmpp3Deliver(cmpp3DeliverPkgs)
 				cmpp3DeliverPkgs = cmpp3DeliverPkgs[:0]
 

@@ -34,6 +34,7 @@ type RedisConfig struct {
 	TimeOut  uint   `toml:"timeout"`
 	Enable   bool   `toml:"enable"`
 	Wait     bool   `toml:"wait"`
+	ClearKey bool   `toml:"clear_key"`
 }
 
 type Config struct {

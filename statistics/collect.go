@@ -22,7 +22,7 @@ type CollectionService interface {
 
 	SaveMachineStatistics(tickerCount int, cpu, mem, disk float64) error
 	SavePackerStatistics(tickerCount int) error
-	AddPackerStatistics(name string, success bool)
+	AddPackerStatistics(source, name string, success bool)
 
 	GetXAxisStart(tickerCount int) int
 	GetXAxisLength(tickerCount int) int
@@ -80,7 +80,6 @@ func (s *Collection) CollectionStatistics() {
 	for {
 		select {
 		case <-t.C:
-			//s.Logger.Info("[Collect][CollectionStatistics] Start", zap.Int("TickerCount", tickerCount))
 			s.SaveMachineStatistics(s.TickerCount)
 			s.SavePackerStatistics(s.TickerCount)
 			s.TickerCount += 1
@@ -103,7 +102,7 @@ func (s *Collection) SaveMachineStatistics(tickerCount int) {
 	diskPercent := diskInfo.UsedPercent
 	err := s.Service.SaveMachineStatistics(tickerCount, cpuPercent, memPercent, diskPercent)
 	if err != nil {
-		s.Logger.Error("[Collection][GetMachineStatistics] Error",
+		s.Logger.Error("[Collection][SaveMachineStatistics] Error",
 			zap.Int("TickerCount", tickerCount),
 			zap.Float64("CpuPercent", cpuPercent),
 			zap.Float64("MemPercent", memPercent),
@@ -219,7 +218,7 @@ func (s *Collection) GraphPackage() {
 		charts.WithLegendOpts(opts.Legend{
 			Show:         true,
 			SelectedMode: "multiple",
-			Bottom:       "-5",
+			Bottom:       "0",
 			Orient:       "horizontal",
 		}),
 		charts.WithTooltipOpts(opts.Tooltip{
@@ -247,16 +246,46 @@ func (s *Collection) GraphPackage() {
 			Type: "min",
 		}),
 	}
-	line.SetXAxis(xAxis).
-		AddSeries("Submit Total Package", GetLineUintItem((*data)[0]), markPoints...).
-		AddSeries("Submit Success Package", GetLineUintItem((*data)[1])).
-		AddSeries("Submit Resp Total Package", GetLineUintItem((*data)[2])).
-		AddSeries("Submit Resp Success Package", GetLineUintItem((*data)[3])).
-		AddSeries("Deliver Total Package", GetLineUintItem((*data)[4])).
-		AddSeries("Deliver Success Package", GetLineUintItem((*data)[5])).
-		AddSeries("Deliver Resp Total Package", GetLineUintItem((*data)[6])).
-		AddSeries("Deliver Resp Success Package", GetLineUintItem((*data)[7])).
-		SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{Smooth: true}))
+
+	line = line.SetXAxis(xAxis)
+	if config.ConfigObj.ClientConfig.Enable && config.ConfigObj.ServerConfig.Enable {
+		line.AddSeries("Client Submit Total Package", GetLineUintItem((*data)[0]), markPoints...).
+			AddSeries("Client Submit Success Package", GetLineUintItem((*data)[1]), markPoints...).
+			AddSeries("Client Submit Resp Total Package", GetLineUintItem((*data)[2]), markPoints...).
+			AddSeries("Client Submit Resp Success Package", GetLineUintItem((*data)[3]), markPoints...).
+			AddSeries("Client Deliver Total Package", GetLineUintItem((*data)[4]), markPoints...).
+			AddSeries("Client Deliver Success Package", GetLineUintItem((*data)[5]), markPoints...).
+			AddSeries("Client Deliver Resp Total Package", GetLineUintItem((*data)[6]), markPoints...).
+			AddSeries("Client Deliver Resp Success Package", GetLineUintItem((*data)[7]), markPoints...)
+
+		line.AddSeries("Server Submit Total Package", GetLineUintItem((*data)[8]), markPoints...).
+			AddSeries("Server Submit Success Package", GetLineUintItem((*data)[9]), markPoints...).
+			AddSeries("Server Submit Resp Total Package", GetLineUintItem((*data)[10]), markPoints...).
+			AddSeries("Server Submit Resp Success Package", GetLineUintItem((*data)[11]), markPoints...).
+			AddSeries("Server Deliver Total Package", GetLineUintItem((*data)[12]), markPoints...).
+			AddSeries("Server Deliver Success Package", GetLineUintItem((*data)[13]), markPoints...).
+			AddSeries("Server Deliver Resp Total Package", GetLineUintItem((*data)[14]), markPoints...).
+			AddSeries("Server Deliver Resp Success Package", GetLineUintItem((*data)[15]), markPoints...).
+			SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{Smooth: true}))
+	} else if config.ConfigObj.ClientConfig.Enable {
+		line.AddSeries("Client Submit Total Package", GetLineUintItem((*data)[0]), markPoints...).
+			AddSeries("Client Submit Success Package", GetLineUintItem((*data)[1]), markPoints...).
+			AddSeries("Client Submit Resp Total Package", GetLineUintItem((*data)[2]), markPoints...).
+			AddSeries("Client Submit Resp Success Package", GetLineUintItem((*data)[3]), markPoints...).
+			AddSeries("Client Deliver Total Package", GetLineUintItem((*data)[4]), markPoints...).
+			AddSeries("Client Deliver Success Package", GetLineUintItem((*data)[5]), markPoints...).
+			AddSeries("Client Deliver Resp Total Package", GetLineUintItem((*data)[6]), markPoints...).
+			AddSeries("Client Deliver Resp Success Package", GetLineUintItem((*data)[7]), markPoints...)
+	} else if config.ConfigObj.ServerConfig.Enable {
+		line.AddSeries("Server Submit Total Package", GetLineUintItem((*data)[0]), markPoints...).
+			AddSeries("Server Submit Success Package", GetLineUintItem((*data)[1]), markPoints...).
+			AddSeries("Server Submit Resp Total Package", GetLineUintItem((*data)[2]), markPoints...).
+			AddSeries("Server Submit Resp Success Package", GetLineUintItem((*data)[3]), markPoints...).
+			AddSeries("Server Deliver Total Package", GetLineUintItem((*data)[4]), markPoints...).
+			AddSeries("Server Deliver Success Package", GetLineUintItem((*data)[5]), markPoints...).
+			AddSeries("Server Deliver Resp Total Package", GetLineUintItem((*data)[6]), markPoints...).
+			AddSeries("Server Deliver Resp Success Package", GetLineUintItem((*data)[7]), markPoints...)
+	}
 
 	f, _ := os.Create("CMPP_Stress_Test_Package.html")
 	renderErr := line.Render(f)
@@ -269,6 +298,9 @@ func (s *Collection) GraphPackage() {
 
 func GetXAxis(start, end, len int) []int {
 	xAxis := make([]int, 0)
+	if len == 0 {
+		return xAxis
+	}
 	multiple := end / len
 	for i := start; i < len; i++ {
 		if multiple != 0 {

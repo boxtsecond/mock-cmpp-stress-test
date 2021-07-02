@@ -2,7 +2,6 @@
 [cmpp_client]
 key = "client"
 version = "V21"
-retries = 1
 read_timeout = 1
 active_test_interval = 60
 max_no_resp_pkg_num = 3
@@ -55,7 +54,9 @@ local_time = true
 [redis]
 ip = "127.0.0.1"
 port = 3306
+db = 0
 password = ""
 timeout = 300
 wait = true
 enable = true
+clear_key = false

@@ -35,32 +35,61 @@ func (s *RedisStatistics) Start() error {
 		return err
 	}
 
-	s.ClearKeys()
-	err := s.InitKeys()
-	if err != nil {
-		s.Logger.Fatal("Redis InitKeys Error", zap.Error(err))
-		return err
+	if s.cfg.ClearKey {
+		s.ClearKeys()
+		err := s.InitKeys()
+		if err != nil {
+			s.Logger.Fatal("Redis InitKeys Error", zap.Error(err))
+			return err
+		}
+	} else {
+		s.CheckKeys()
 	}
 	return nil
 }
 
 func (s *RedisStatistics) ClearKeys() {
-	keys := []string{
-		"Machine", "Packer",
-		"Submit_Total", "Submit_Success",
-		"SubmitResp_Total", "SubmitResp_Success",
-		"Deliver_Total", "Deliver_Success",
-		"DeliverResp_Total", "DeliverResp_Success",
+	keys := make([]string, 0)
+	if config.ConfigObj.ClientConfig.Enable {
+		keys = []string{
+			"ClientMachine", "ClientPacker",
+			"Client_Submit_Total", "Client_Submit_Success",
+			"Client_SubmitResp_Total", "Client_SubmitResp_Success",
+			"Client_Deliver_Total", "Client_Deliver_Success",
+			"Client_DeliverResp_Total", "Client_DeliverResp_Success",
+		}
+	}
+
+	if config.ConfigObj.ServerConfig.Enable {
+		keys = append(keys, []string{
+			"ServerMachine", "ServerPacker",
+			"Server_Submit_Total", "Server_Submit_Success",
+			"Server_SubmitResp_Total", "Server_SubmitResp_Success",
+			"Server_Deliver_Total", "Server_Deliver_Success",
+			"Server_DeliverResp_Total", "Server_DeliverResp_Success",
+		}...)
 	}
 	s.Client.Del(s.ctx, keys...)
 }
 
 func (s *RedisStatistics) InitKeys() error {
-	keys := []string{
-		"Submit_Total", "Submit_Success",
-		"SubmitResp_Total", "SubmitResp_Success",
-		"Deliver_Total", "Deliver_Success",
-		"DeliverResp_Total", "DeliverResp_Success",
+	keys := make([]string, 0)
+	if config.ConfigObj.ClientConfig.Enable {
+		keys = []string{
+			"Client_Submit_Total", "Client_Submit_Success",
+			"Client_SubmitResp_Total", "Client_SubmitResp_Success",
+			"Client_Deliver_Total", "Client_Deliver_Success",
+			"Client_DeliverResp_Total", "Client_DeliverResp_Success",
+		}
+	}
+
+	if config.ConfigObj.ServerConfig.Enable {
+		keys = append(keys, []string{
+			"Server_Submit_Total", "Server_Submit_Success",
+			"Server_SubmitResp_Total", "Server_SubmitResp_Success",
+			"Server_Deliver_Total", "Server_Deliver_Success",
+			"Server_DeliverResp_Total", "Server_DeliverResp_Success",
+		}...)
 	}
 	pipeline := s.Client.Pipeline()
 	for _, k := range keys {
@@ -71,6 +100,47 @@ func (s *RedisStatistics) InitKeys() error {
 		return err
 	}
 	return nil
+}
+
+func (s *RedisStatistics) CheckKeys() {
+	keys := make([]string, 0)
+	if config.ConfigObj.ClientConfig.Enable {
+		keys = []string{
+			"Client_Submit_Total", "Client_Submit_Success",
+			"Client_SubmitResp_Total", "Client_SubmitResp_Success",
+			"Client_Deliver_Total", "Client_Deliver_Success",
+			"Client_DeliverResp_Total", "Client_DeliverResp_Success",
+		}
+	}
+
+	if config.ConfigObj.ServerConfig.Enable {
+		keys = append(keys, []string{
+			"Server_Submit_Total", "Server_Submit_Success",
+			"Server_SubmitResp_Total", "Server_SubmitResp_Success",
+			"Server_Deliver_Total", "Server_Deliver_Success",
+			"Server_DeliverResp_Total", "Server_DeliverResp_Success",
+		}...)
+	}
+	pipeline := s.Client.Pipeline()
+	for _, k := range keys {
+		pipeline.Get(s.ctx, k)
+	}
+
+	initKeys := make([]string, 0)
+	cmds, _ := pipeline.Exec(s.ctx)
+	for i, _ := range cmds {
+		_, e := cmds[i].(*redis.StringCmd).Result()
+		if e == redis.Nil {
+			initKeys = append(initKeys, keys[i])
+		}
+	}
+	p := s.Client.Pipeline()
+	for _, k := range keys {
+		p.Set(s.ctx, k, 0, 0)
+	}
+	p.Exec(s.ctx)
+
+	return
 }
 
 func (s *RedisStatistics) Stop() error {
@@ -87,7 +157,14 @@ func (s *RedisStatistics) NewRedisClient() *redis.Client {
 }
 
 func (s *RedisStatistics) SaveMachineStatistics(tickerCount int, cpu, mem, disk float64) error {
-	key := "Machine"
+	key := ""
+	if config.ConfigObj.ClientConfig.Enable {
+		key = "ClientMachine"
+	}
+
+	if config.ConfigObj.ServerConfig.Enable {
+		key = "ServerMachine"
+	}
 	status := s.Client.ZAdd(s.ctx, key, &redis.Z{
 		Score: float64(tickerCount),
 		Member: strings.Join([]string{
@@ -101,17 +178,33 @@ func (s *RedisStatistics) SaveMachineStatistics(tickerCount int, cpu, mem, disk 
 
 func (s *RedisStatistics) SavePackerStatistics(tickerCount int) error {
 	keys := make([]string, 0)
+	packerKey := ""
+	enableCount := 0
+
 	if config.ConfigObj.ClientConfig.Enable {
+		packerKey = "ClientPacker"
 		keys = []string{
-			"Submit_Total", "Submit_Success",
-			"SubmitResp_Total", "SubmitResp_Success",
-			"Deliver_Total", "Deliver_Success",
-			//"DeliverResp_Total", "DeliverResp_Success",
+			"Client_Submit_Total", "Client_Submit_Success",
+			"Client_SubmitResp_Total", "Client_SubmitResp_Success",
+			"Client_Deliver_Total", "Client_Deliver_Success",
+			"Client_DeliverResp_Total", "Client_DeliverResp_Success",
 		}
+		enableCount += 1
 	}
 
 	if config.ConfigObj.ServerConfig.Enable {
-		keys = append(keys, []string{"DeliverResp_Total", "DeliverResp_Success"}...)
+		packerKey = "ServerPacker"
+		keys = append(keys, []string{
+			"Server_Submit_Total", "Server_Submit_Success",
+			"Server_SubmitResp_Total", "Server_SubmitResp_Success",
+			"Server_Deliver_Total", "Server_Deliver_Success",
+			"Server_DeliverResp_Total", "Server_DeliverResp_Success",
+		}...)
+		enableCount += 1
+	}
+
+	if enableCount == 2 {
+		packerKey = "Packer"
 	}
 
 	pipeline := s.Client.Pipeline()
@@ -131,17 +224,17 @@ func (s *RedisStatistics) SavePackerStatistics(tickerCount int) error {
 
 	members = append(members, strconv.Itoa(tickerCount))
 
-	status := s.Client.ZAdd(s.ctx, "Packer", &redis.Z{
+	status := s.Client.ZAdd(s.ctx, packerKey, &redis.Z{
 		Score:  float64(tickerCount),
 		Member: strings.Join(members, ","),
 	})
 	return status.Err()
 }
 
-func (s *RedisStatistics) AddPackerStatistics(name string, success bool) {
-	key := []string{fmt.Sprintf("%s_Total", name)}
+func (s *RedisStatistics) AddPackerStatistics(source, name string, success bool) {
+	key := []string{fmt.Sprintf("%s_%s_Total", source, name)}
 	if success {
-		key = append(key, fmt.Sprintf("%s_Success", name))
+		key = append(key, fmt.Sprintf("%s_%s_Success", source, name))
 	}
 	for _, k := range key {
 		if err := s.Increase(k); err != nil {
@@ -208,25 +301,29 @@ func (s *RedisStatistics) GetMachineStatistics(tickerCount int) (err error, cpu,
 
 func (s *RedisStatistics) GetPackerStatistics(tickerCount int) (error, *[][]uint64) {
 	offset := 0
-	interval := 5
-	result := make([][]uint64, 8)
+	interval := 10000
+	result := make([][]uint64, 16)
+	packerKey := ""
+	keyLen := 0
+
+	if config.ConfigObj.ClientConfig.Enable {
+		packerKey = "ClientPacker"
+		keyLen += 8
+	}
+
+	if config.ConfigObj.ServerConfig.Enable {
+		packerKey = "ServerPacker"
+		keyLen += 8
+	}
+
 	for {
-		vals, e := s.Client.ZRangeByScore(s.ctx, "Packer", &redis.ZRangeBy{
+		vals, e := s.Client.ZRangeByScore(s.ctx, packerKey, &redis.ZRangeBy{
 			Min: strconv.Itoa(offset),
 			Max: strconv.Itoa(offset + interval),
 		}).Result()
 
 		if e != nil {
 			return e, nil
-		}
-
-		keyLen := 0
-		if config.ConfigObj.ClientConfig.Enable {
-			keyLen = 6
-		}
-
-		if config.ConfigObj.ServerConfig.Enable {
-			keyLen += 2
 		}
 
 		for _, v := range vals {

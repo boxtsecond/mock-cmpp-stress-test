@@ -13,6 +13,6 @@ type CmppServerConfig struct {
 	Enable       bool              `toml:"enable"`
 	Version      string            `toml:"version"`
 	HeartBeat    uint8             `toml:"heartbeat"`
-	MaxNoRspPkgs uint8             `toml:"max_no_resp_pkgs"`
+	MaxNoRspPkgs uint              `toml:"max_no_resp_pkgs"`
 	Auths        *[]CmppServerAuth `toml:"auths"`
 }

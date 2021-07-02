@@ -18,8 +18,6 @@ mock-cmpp-stress-test 是针对CMPP协议下短信发送服务的轻量级压测
 [cmpp_client]
 # cmpp 客户端使用的版本
 version = "V21"
-# cmpp 连接重试次数
-retries = 1
 # cmpp 连接读包超时时间，单位秒
 read_timeout = 1
 # cmpp 连接心跳间隔时间，单位秒
@@ -115,12 +113,16 @@ local_time = true
 ip = "127.0.0.1"
 # redis 服务端口号
 port = 3306
+# redis 库
+db = 0
 # redis 服务密码
 password = ""
 # redis 超时时间，单位秒
 timeout = 300
 # 是否启用 redis 存储统计数据，若不启用，则使用内存存储统计数据，统计数据维度将少于启用 redis 存储统计数据。
 enable = true
+# 是否清除上次遗留数据
+clear_key = true
 ##################### redis配置模块 ##################### 
 ```
 ### 功能说明：

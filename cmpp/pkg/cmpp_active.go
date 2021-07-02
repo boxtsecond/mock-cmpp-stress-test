@@ -20,3 +20,10 @@ func (cm *CmppClientManager) SendCmppActiveTestReq(pkg *cmpp.CmppActiveTestReqPk
 }
 
 // =====================CmppClient=====================
+
+// =====================CmppServer=====================
+func (sm *CmppServerManager) CmppActiveTestReq(pkg *cmpp.CmppActiveTestReqPkt, res *cmpp.Response) (bool, error) {
+	return false, nil
+}
+
+// =====================CmppServer=====================

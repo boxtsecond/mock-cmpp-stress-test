@@ -5,7 +5,8 @@ import (
 	"errors"
 	cmpp "github.com/bigwhite/gocmpp"
 	"go.uber.org/zap"
-	"mock-cmpp-stress-test/cmpp/client"
+	"math/rand"
+	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
 	"sync"
 	"sync/atomic"
@@ -33,7 +34,7 @@ func (st *StressTest) Start() error {
 		return nil
 	}
 
-	if len(client.Clients) == 0 {
+	if len(pkg.Clients) == 0 {
 		err := errors.New("cmpp clients have no available")
 		st.Logger.Error("Stress Test Start Error", zap.Error(err))
 		return err
@@ -45,6 +46,8 @@ func (st *StressTest) Start() error {
 			st.Logger.Error("Stress Test Worker Config Error", zap.Error(err))
 			return err
 		}
+
+		time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
 		if worker.TotalNum != 0 {
 			go st.StartWorkerByTotalNum(&worker)
@@ -67,7 +70,7 @@ func (st *StressTest) Stop() error {
 }
 
 func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker) {
-	cmppClient, ok := client.Clients[worker.Name]
+	_, ok := pkg.Clients[worker.Name]
 	if !ok {
 		st.Logger.Error("[StressTest][StartWorkerByDurationTime] Error", zap.Error(errors.New("can't find cmpp client")))
 		return
@@ -89,31 +92,34 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 	for count < worker.DurationTime {
 		select {
 		case <-ticker.C:
+			// 重新获取，可能重连
+			c, _ := pkg.Clients[worker.Name]
+			st.Logger.Info("Stress Test Ticker Duration Time", zap.Uint64("DurationTime", count))
 			for i := uint64(0); i < workerNum; i++ {
 				go func(id uint64) {
 					for sendNum := uint64(0); sendNum < concurrency; sendNum++ {
 						for _, msg := range *st.cfg.Messages {
-							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
-								cmppClient.Cmpp2Submit(&msg)
-							} else if cmppClient.Version == cmpp.V30 {
-								cmppClient.Cmpp3Submit(&msg)
+							if c.Version == cmpp.V20 || c.Version == cmpp.V21 {
+								c.Cmpp2Submit(&msg)
+							} else if c.Version == cmpp.V30 {
+								c.Cmpp3Submit(&msg)
 							}
-						}
-						if worker.Sleep > 0 {
-							time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
 						}
 					}
 				}(i)
+				if worker.Sleep > 0 {
+					time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
+				}
 			}
 			atomic.AddUint64(&count, 1)
-		case <-st.ctx.Done(): // if cancel() execute
+		case <-st.ctx.Done():
 			return
 		}
 	}
 }
 
 func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
-	cmppClient, ok := client.Clients[worker.Name]
+	_, ok := pkg.Clients[worker.Name]
 	if !ok {
 		st.Logger.Error("[StressTest][StartWorkerByTotalNum] Error", zap.Error(errors.New("can't find cmpp client")))
 		return
@@ -138,6 +144,7 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 		select {
 		case <-ticker.C:
 			st.Logger.Info("Stress Test Ticker Total", zap.Uint64("Total", total))
+			c, _ := pkg.Clients[worker.Name]
 			for i := uint64(0); i < workerNum; i++ {
 				if total >= worker.TotalNum {
 					return
@@ -153,17 +160,17 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 							}
 							mutex.Unlock()
 							st.Logger.Info("Stress Test Worker Start", zap.Uint64("WorkerNum", id), zap.Uint64("Total", total))
-							if cmppClient.Version == cmpp.V20 || cmppClient.Version == cmpp.V21 {
-								cmppClient.Cmpp2Submit(&msg)
-							} else if cmppClient.Version == cmpp.V30 {
-								cmppClient.Cmpp3Submit(&msg)
-							}
-							if worker.Sleep > 0 {
-								time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
+							if c.Version == cmpp.V20 || c.Version == cmpp.V21 {
+								c.Cmpp2Submit(&msg)
+							} else if c.Version == cmpp.V30 {
+								c.Cmpp3Submit(&msg)
 							}
 						}
 					}
 				}(i)
+				if worker.Sleep > 0 {
+					time.Sleep(time.Duration(worker.Sleep) * time.Millisecond)
+				}
 			}
 		case <-st.ctx.Done():
 			return
