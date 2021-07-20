@@ -155,7 +155,7 @@ func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 						for _, msg := range *st.cfg.Messages {
 							mutex.Lock()
 							atomic.AddUint64(&total, 1)
-							if total >= worker.TotalNum+1 {
+							if atomic.LoadUint64(&total) >= worker.TotalNum+1 {
 								return
 							}
 							mutex.Unlock()
