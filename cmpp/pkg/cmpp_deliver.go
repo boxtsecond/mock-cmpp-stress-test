@@ -80,7 +80,6 @@ func (cm *CmppClientManager) Cmpp2SubmitPkg(pkg *cmpp.Cmpp2SubmitReqPkt) {
 		zap.String("SpCode", cm.SpCode),
 		zap.String("Phone", phone),
 		zap.Any("SeqId", seqId))
-	return
 }
 
 func (cm *CmppClientManager) BatchCmpp3Submit(pkgs []*cmpp.Cmpp3SubmitReqPkt) {
@@ -113,7 +112,6 @@ func (cm *CmppClientManager) Cmpp3SubmitPkg(pkg *cmpp.Cmpp3SubmitReqPkt) {
 		zap.String("Phone", phone),
 		zap.Any("SeqId", seqId))
 	statistics.CollectService.Service.AddPackerStatistics("Client", "Submit", true)
-	return
 }
 
 // =====================CmppClient=====================
@@ -154,7 +152,7 @@ func (sm *CmppServerManager) MockCmpp2Deliver(addr, spCode string, msgId uint64,
 	deliverPkg.MsgLength = uint8(len(msgContent))
 
 	// 返回状态报告
-	go sm.SendCmpp2DeliverPkg(deliverPkg, addr)
+	sm.SendCmpp2DeliverPkg(deliverPkg, addr)
 }
 
 func (sm *CmppServerManager) SendCmpp2DeliverPkg(pkg *cmpp.Cmpp2DeliverReqPkt, addr string) {
@@ -288,6 +286,16 @@ type Cmpp2StatsReportMsgContent struct {
 	SmscSequence   uint32
 }
 
+// Cmpp3状态报告消息内容
+type Cmpp3StatsReportMsgContent struct {
+	MsgId          uint64
+	Stat           string
+	SubmitTime     string
+	DoneTime       string
+	DestTerminalId string
+	SmscSequence   uint32
+}
+
 func (p *Cmpp2StatsReportMsgContent) Encode() (string, error) {
 	var pkgLen uint32 = 8 + 7 + 10 + 10 + 21 + 4
 
@@ -297,6 +305,25 @@ func (p *Cmpp2StatsReportMsgContent) Encode() (string, error) {
 	w.WriteFixedSizeString(p.SubmitTime, 10)
 	w.WriteFixedSizeString(p.DoneTime, 10)
 	w.WriteFixedSizeString(p.DestTerminalId, 21)
+	w.WriteInt(p.SmscSequence, 0, binary.BigEndian)
+
+	b, err := w.Bytes()
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
+}
+
+func (p *Cmpp3StatsReportMsgContent) Encode() (string, error) {
+	var pkgLen uint32 = 8 + 7 + 10 + 10 + 21 + 4
+
+	w := buf.NewBufWriter(pkgLen)
+	w.WriteInt(p.MsgId, 0, binary.BigEndian)
+	w.WriteFixedSizeString(p.Stat, 7)
+	w.WriteFixedSizeString(p.SubmitTime, 10)
+	w.WriteFixedSizeString(p.DoneTime, 10)
+	w.WriteFixedSizeString(p.DestTerminalId, 32)
 	w.WriteInt(p.SmscSequence, 0, binary.BigEndian)
 
 	b, err := w.Bytes()
@@ -321,15 +348,15 @@ func formatReportMsgContent(version string, msgId uint64, stat string, submitTim
 		}
 		content, err = msg.Encode()
 	} else {
-		//msg := &pkg.Cmpp3StatsReportMsgContent{
-		//	MsgId:          msgId,
-		//	Stat:           stat,
-		//	SubmitTime:     submitTime,
-		//	DoneTime:       doneTime,
-		//	DestTerminalId: destTerminalId,
-		//	SmscSequence:   smscSeq,
-		//}
-		//content, err = msg.Encode()
+		msg := &Cmpp3StatsReportMsgContent{
+			MsgId:          msgId,
+			Stat:           stat,
+			SubmitTime:     submitTime,
+			DoneTime:       doneTime,
+			DestTerminalId: destTerminalId,
+			SmscSequence:   smscSeq,
+		}
+		content, err = msg.Encode()
 	}
 
 	if err != nil {

@@ -1,7 +1,7 @@
 # cmpp 客户端配置
 [cmpp_client]
 key = "client"
-version = "V21"
+version = "V30"
 read_timeout = 1
 active_test_interval = 60
 max_no_resp_pkg_num = 3
@@ -26,7 +26,8 @@ phone = "12345678901"
 ip = "127.0.0.1"
 port = 7890
 enable = true
-version = "V21"
+version = "V30"
+deliver_interval = 5
 # 心跳检测时间
 heartbeat = 1
 # 无响应时发送最大包个数
@@ -58,5 +59,5 @@ db = 0
 password = ""
 timeout = 300
 wait = true
-enable = true
+enable = false
 clear_key = false

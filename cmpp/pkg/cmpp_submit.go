@@ -75,7 +75,6 @@ func (cm *CmppClientManager) Cmpp2Submit(message *config.TextMessages) {
 		cm.SendCmpp2SubmitPkg(pkg)
 	}
 
-	return
 }
 
 func (sm *CmppClientManager) SendCmpp2SubmitPkg(pkg *cmpp.Cmpp2SubmitReqPkt) {
@@ -163,7 +162,6 @@ func (cm *CmppClientManager) Cmpp3Submit(message *config.TextMessages) {
 		cm.SendCmpp3SubmitPkg(pkg)
 	}
 
-	return
 }
 
 func (sm *CmppClientManager) SendCmpp3SubmitPkg(pkg *cmpp.Cmpp3SubmitReqPkt) {
@@ -249,34 +247,16 @@ func (sm *CmppServerManager) Cmpp3Submit(req *cmpp.Packet, res *cmpp.Response) (
 		statistics.CollectService.Service.AddPackerStatistics("Server", "Submit", false)
 		return false, cmpp.ConnRspStatusErrMap[cmpp.ErrnoConnOthers]
 	}
-
-	for _, phone := range pkg.DestTerminalId {
-		deliverPkg := &cmpp.Cmpp3DeliverReqPkt{
-			MsgId:            msgId,
-			DestId:           account.spCode,
-			ServiceId:        account.spId,
-			TpPid:            0,
-			TpUdhi:           0,
-			MsgFmt:           0,
-			SrcTerminalId:    phone,
-			RegisterDelivery: 1,
-			MsgLength:        uint8(len("DELIVRD")),
-			MsgContent:       "DELIVRD",
-		}
-		log.Logger.Info("[CmppServer][Cmpp3Submit] Success",
-			zap.String("SpId", account.spId),
-			zap.String("Phone", phone),
-			zap.String("MsgId", string(msgId)),
-			zap.String("RemoteAddr", addr))
-		statistics.CollectService.Service.AddPackerStatistics("Server", "Submit", true)
-
-		// 返回状态报告
-		go sm.SendCmpp3DeliverPkg(deliverPkg, addr)
-	}
-
 	resp.MsgId = msgId
+	log.Logger.Info("[CmppServer][Cmpp3Submit] Success",
+		zap.String("SpId", account.spId),
+		zap.String("Phone", pkg.DestTerminalId[0]),
+		zap.Uint16("SeqId", seqId),
+		zap.Uint64("MsgId", msgId),
+		zap.String("RemoteAddr", addr))
 	statistics.CollectService.Service.AddPackerStatistics("Server", "Submit", true)
 	statistics.CollectService.Service.AddPackerStatistics("Server", "SubmitResp", true)
+	go sm.MockCmpp3Deliver(addr, account.spCode, msgId, pkg)
 	return false, nil
 }
 

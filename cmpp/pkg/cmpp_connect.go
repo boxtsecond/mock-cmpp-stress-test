@@ -20,7 +20,7 @@ import (
 	"mock-cmpp-stress-test/utils/log"
 )
 
-var Clients = make(map[string]*CmppClientManager, 0)
+var Clients = make(map[string]*CmppClientManager)
 
 // =====================CmppClient=====================
 func (cm *CmppClientManager) Init(cfg *config.CmppClientConfig, addr string, account config.CmppAccount) error {
@@ -184,7 +184,6 @@ func (cm *CmppClientManager) Reconnect() {
 
 	key := strings.Join([]string{ncm.Addr, ncm.UserName}, "_")
 	Clients[key] = ncm
-	return
 }
 
 func (cm *CmppClientManager) StartSubmit() {
@@ -351,7 +350,7 @@ func (sm *CmppServerManager) Start() error {
 
 	log.Logger.Info("[CmppServer][Start] Success",
 		zap.String("Address", sm.Addr),
-		zap.String("Version", string(sm.Version)))
+		zap.String("Version", sm.Version.String()))
 	return nil
 }
 
@@ -434,7 +433,6 @@ func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet,
 		return sm.Cmpp2Submit(pkg, res)
 	case *cmpp.Cmpp3SubmitReqPkt:
 		return sm.Cmpp3Submit(pkg, res)
-
 	case *cmpp.Cmpp2DeliverRspPkt:
 		return sm.Cmpp2DeliverResp(p, res)
 	case *cmpp.Cmpp3DeliverRspPkt:

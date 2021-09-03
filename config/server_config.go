@@ -8,11 +8,12 @@ type CmppServerAuth struct {
 }
 
 type CmppServerConfig struct {
-	IP           string            `toml:"ip"`
-	Port         uint16            `toml:"port"`
-	Enable       bool              `toml:"enable"`
-	Version      string            `toml:"version"`
-	HeartBeat    uint8             `toml:"heartbeat"`
-	MaxNoRspPkgs uint              `toml:"max_no_resp_pkgs"`
-	Auths        *[]CmppServerAuth `toml:"auths"`
+	IP              string            `toml:"ip"`
+	Port            uint16            `toml:"port"`
+	Enable          bool              `toml:"enable"`
+	Version         string            `toml:"version"`
+	HeartBeat       uint8             `toml:"heartbeat"`
+	MaxNoRspPkgs    uint              `toml:"max_no_resp_pkgs"`
+	Auths           *[]CmppServerAuth `toml:"auths"`
+	DeliverInterval uint8             `toml:"deliver_interval"` // 回执发送间隔时间
 }

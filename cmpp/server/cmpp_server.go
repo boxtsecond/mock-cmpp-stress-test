@@ -66,7 +66,7 @@ func (s *CmppServer) Stop() error {
 func (s *CmppServer) StartDeliver() {
 	cmpp2DeliverPkgs := make([]*pkg.MockCmpp2DeliverPkg, 0)
 	cmpp3DeliverPkgs := make([]*pkg.MockCmpp3DeliverPkg, 0)
-	tk := time.NewTicker(1 * time.Second)
+	tk := time.NewTicker(time.Duration(s.cfg.DeliverInterval) * time.Second)
 
 	defer func() {
 		tk.Stop()
@@ -96,6 +96,7 @@ func (s *CmppServer) StartDeliver() {
 
 			}
 		case <-tk.C:
+
 			if len(cmpp2DeliverPkgs) > 0 {
 				csm.BatchCmpp2Deliver(cmpp2DeliverPkgs)
 				cmpp2DeliverPkgs = cmpp2DeliverPkgs[:0]
