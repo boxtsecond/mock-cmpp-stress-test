@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	defaultRetries = 3
 	defaultTimeout = 5 * time.Second
 )
 

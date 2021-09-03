@@ -1,7 +1,8 @@
 # Test binary, built with `go test -c`
 *.test
-
+*.html
 .idea
 log
 log/*.log
-./tmp/*
+tmp/
+mock-cmpp-stress-test
