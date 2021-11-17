@@ -73,13 +73,34 @@ func (cm *CmppClientManager) Disconnect() {
 	log.Logger.Info("[CmppClient][Disconnect] Success", zap.String("Addr", cm.Addr), zap.String("UserName", cm.UserName), zap.String("Password", cm.Password))
 }
 
+func (cm *CmppClientManager) Cmpp2ConnRsp(resp *cmpp.Cmpp2ConnRspPkt) error {
+	if resp.Status == 0 {
+		log.Logger.Info("[CmppClient][Cmpp2ConnRsp] Success", zap.Uint32("SeqId", resp.SeqId), zap.Any("Version", resp.Version))
+	} else {
+		log.Logger.Info("[CmppClient][Cmpp2ConnRsp] Error", zap.Uint32("SeqId", resp.SeqId), zap.Any("Version", resp.Version))
+	}
+	return nil
+}
+
+func (cm *CmppClientManager) Cmpp3ConnRsp(resp *cmpp.Cmpp3ConnRspPkt) error {
+	if resp.Status == 0 {
+		log.Logger.Info("[CmppClient][Cmpp3ConnRsp] Success", zap.Uint32("SeqId", resp.SeqId), zap.Any("Version", resp.Version))
+	} else {
+		log.Logger.Info("[CmppClient][Cmpp3ConnRsp] Error", zap.Uint32("SeqId", resp.SeqId), zap.Any("Version", resp.Version))
+	}
+	return nil
+}
+
 func (cm *CmppClientManager) ReceivePkg(pkg interface{}) error {
 	switch p := pkg.(type) {
 	case *cmpp.CmppActiveTestReqPkt:
 		return cm.CmppActiveTestReq(p) // 收到来自服务端的心跳检测包
 	case *cmpp.CmppActiveTestRspPkt:
 		return cm.CmppActiveTestRsp(p) // 收到服务端回复的心跳检测包
-
+	case *cmpp.Cmpp2ConnRspPkt: // 服务端连接回包
+		return cm.Cmpp2ConnRsp(p)
+	case *cmpp.Cmpp3ConnRspPkt: // 服务端连接回包
+		return cm.Cmpp3ConnRsp(p)
 	case *cmpp.Cmpp2SubmitRspPkt:
 		return cm.Cmpp2SubmitResp(p)
 	case *cmpp.Cmpp3SubmitRspPkt:
@@ -143,7 +164,6 @@ func (cm *CmppClientManager) KeepAlive() {
 func (cm *CmppClientManager) Reconnect() {
 	cm.cancel()
 	time.Sleep(100 * time.Millisecond)
-
 	ncm := &CmppClientManager{}
 	addrArr := strings.Split(cm.Addr, ":")
 	port, _ := strconv.Atoi(addrArr[1])
@@ -425,10 +445,8 @@ func (sm *CmppServerManager) PacketHandler(res *cmpp.Response, pkg *cmpp.Packet,
 	switch p := pkg.Packer.(type) {
 	case *cmpp.CmppConnReqPkt: // 处理cmpp连接请求
 		return sm.Connect(pkg, res)
-
 	case *cmpp.CmppActiveTestReqPkt:
 		return sm.CmppActiveTestReq(p, res)
-
 	case *cmpp.Cmpp2SubmitReqPkt:
 		return sm.Cmpp2Submit(pkg, res)
 	case *cmpp.Cmpp3SubmitReqPkt:

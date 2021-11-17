@@ -35,7 +35,14 @@ var Services = []Service{
 
 func Init() error {
 	// init log
+	if config.ConfigObj.Log == nil {
+		config.ConfigObj.Log = &log.Config{
+			Dir:  "./log",
+			File: "mock-cmpp-stress-test.log",
+		}
+	}
 	if err := config.Init(); err != nil {
+		log.Init(config.ConfigObj.Log)
 		return errors.New(fmt.Sprintf("Load Config Error: %s", err.Error()))
 	}
 	log.Init(config.ConfigObj.Log)

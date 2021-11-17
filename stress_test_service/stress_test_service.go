@@ -121,7 +121,7 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
 	_, ok := pkg.Clients[worker.Name]
 	if !ok {
-		st.Logger.Error("[StressTest][StartWorkerByTotalNum] Error", zap.Error(errors.New("can't find cmpp client")))
+		st.Logger.Error("[StressTest][StartWorkerByTotalNum] Error", zap.Error(errors.New("can't find cmpp client")), zap.String("worker.Name", worker.Name))
 		return
 	}
 

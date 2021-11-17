@@ -112,6 +112,7 @@ func (cm *CmppClientManager) Cmpp3SubmitPkg(pkg *cmpp.Cmpp3SubmitReqPkt) {
 		zap.String("Phone", phone),
 		zap.Any("SeqId", seqId))
 	statistics.CollectService.Service.AddPackerStatistics("Client", "Submit", true)
+
 }
 
 // =====================CmppClient=====================
@@ -316,7 +317,7 @@ func (p *Cmpp2StatsReportMsgContent) Encode() (string, error) {
 }
 
 func (p *Cmpp3StatsReportMsgContent) Encode() (string, error) {
-	var pkgLen uint32 = 8 + 7 + 10 + 10 + 21 + 4
+	var pkgLen uint32 = 8 + 7 + 10 + 10 + 32 + 4
 
 	w := buf.NewBufWriter(pkgLen)
 	w.WriteInt(p.MsgId, 0, binary.BigEndian)

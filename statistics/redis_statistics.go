@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
 	"mock-cmpp-stress-test/config"
+	"mock-cmpp-stress-test/utils/log"
 	"strconv"
 	"strings"
 	"time"
@@ -138,7 +139,8 @@ func (s *RedisStatistics) CheckKeys() {
 	for _, k := range keys {
 		p.Set(s.ctx, k, 0, 0)
 	}
-	p.Exec(s.ctx)
+	_, err := p.Exec(s.ctx)
+	log.Logger.Error("CheckKeys Error", zap.Error(err))
 
 	return
 }

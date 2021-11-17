@@ -23,6 +23,9 @@ func (cm *CmppClientManager) SendCmppActiveTestReq(pkg *cmpp.CmppActiveTestReqPk
 
 // =====================CmppServer=====================
 func (sm *CmppServerManager) CmppActiveTestReq(pkg *cmpp.CmppActiveTestReqPkt, res *cmpp.Response) (bool, error) {
+	resp := res.Packer.(*cmpp.CmppActiveTestRspPkt)
+	resp.Reserved = 1
+	resp.SeqId = pkg.SeqId
 	return false, nil
 }
 
