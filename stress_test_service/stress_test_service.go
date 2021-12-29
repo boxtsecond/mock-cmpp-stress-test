@@ -3,14 +3,15 @@ package stress_test_service
 import (
 	"context"
 	"errors"
-	cmpp "github.com/bigwhite/gocmpp"
-	"go.uber.org/zap"
 	"math/rand"
 	"mock-cmpp-stress-test/cmpp/pkg"
 	"mock-cmpp-stress-test/config"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	cmpp "github.com/bigwhite/gocmpp"
+	"go.uber.org/zap"
 )
 
 const defaultConcurrency = 1000
@@ -50,12 +51,12 @@ func (st *StressTest) Start() error {
 		time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
 		if worker.TotalNum != 0 {
-			go st.StartWorkerByTotalNum(&worker)
+			go st.StartWorkerByTotalNum(worker)
 			continue
 		}
 
 		if worker.DurationTime != 0 {
-			go st.StartWorkerByDurationTime(&worker)
+			go st.StartWorkerByDurationTime(worker)
 			continue
 		}
 	}
@@ -69,7 +70,7 @@ func (st *StressTest) Stop() error {
 	return nil
 }
 
-func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker) {
+func (st *StressTest) StartWorkerByDurationTime(worker config.StressTestWorker) {
 	_, ok := pkg.Clients[worker.Name]
 	if !ok {
 		st.Logger.Error("[StressTest][StartWorkerByDurationTime] Error", zap.Error(errors.New("can't find cmpp client")))
@@ -118,7 +119,7 @@ func (st *StressTest) StartWorkerByDurationTime(worker *config.StressTestWorker)
 	}
 }
 
-func (st *StressTest) StartWorkerByTotalNum(worker *config.StressTestWorker) {
+func (st *StressTest) StartWorkerByTotalNum(worker config.StressTestWorker) {
 	_, ok := pkg.Clients[worker.Name]
 	if !ok {
 		st.Logger.Error("[StressTest][StartWorkerByTotalNum] Error", zap.Error(errors.New("can't find cmpp client")))
